@@ -117,6 +117,6 @@ def test_send_alert_to_discord():
             rate_limit_retry=True,
             username="$COMPQ",
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-            content="💚  Test alert",
+            content="💚  Test alert [📈](https://stockcharts.com/h-sc/ui?s=$COMPQ)",
         )
         mock_discord.return_value.execute.assert_called_once()

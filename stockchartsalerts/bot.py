@@ -61,7 +61,7 @@ def send_alert_to_discord(alert: dict) -> None:
         rate_limit_retry=True,
         username=alert["symbol"],
         avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-        content=f"{get_emoji(alert)}  {alert["alert"]}",
+        content=f"{get_emoji(alert)}  {alert["alert"]} [📈](https://stockcharts.com/h-sc/ui?s={alert['symbol']})",
     )
 
     webhook.execute()
