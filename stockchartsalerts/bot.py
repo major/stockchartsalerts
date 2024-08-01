@@ -24,6 +24,7 @@ def get_alerts() -> list:
 def get_new_alerts() -> list:
     """Return only new alerts"""
     alerts = get_alerts()
+    alerts = filter_alerts(alerts)
 
     # Get the time of the previous run in Eastern time.
     eastern_time = pytz.timezone("America/New_York")
@@ -34,6 +35,12 @@ def get_new_alerts() -> list:
     default_date = datetime.combine(datetime.now(), time(0, tzinfo=tz.gettz("America/New_York")))
 
     return [x for x in alerts if parse(x["lastfired"], default=default_date) > previous_run]
+
+
+def filter_alerts(alerts: list) -> list:
+    """Filter out alerts that we don't want to send."""
+    banned_strings = ["There are no alerts today"]
+    return [x for x in alerts if x["alert"] not in banned_strings]
 
 
 def get_emoji(alert: dict) -> str:

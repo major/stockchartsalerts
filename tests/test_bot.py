@@ -7,6 +7,7 @@ import freezegun
 from stockchartsalerts import bot
 
 SAMPLE_ALERTS = [
+    {"alert": "There are no alerts today", "newalert": "yes", "bearish": "", "lastfired": "1 Aug 2024, 8:11 AM ET"},
     {
         "symbol": "$BPSPX",
         "alertpaused": "no",
@@ -74,6 +75,14 @@ def test_get_new_alerts(mock_get_alerts):
     assert [x["symbol"] for x in alerts] == ["$BPSPX", "$BPINFO", "$INDU"]
 
 
+@mock.patch("stockchartsalerts.bot.get_alerts", return_value=SAMPLE_ALERTS)
+def test_filter_alerts(mock_get_alerts):
+    """Verify the alert filter works."""
+    alerts = bot.get_alerts()
+    alerts = bot.filter_alerts(alerts)
+    assert len(alerts) == 5
+
+
 def test_get_alerts(httpx_mock):
     """Verify that we get alerts."""
     httpx_mock.add_response(
@@ -85,8 +94,7 @@ def test_get_alerts(httpx_mock):
     assert alerts == SAMPLE_ALERTS
 
     alerts = bot.get_alerts()
-    assert len(alerts) == 5
-    assert [x["symbol"] for x in alerts] == ["$BPSPX", "$BPINFO", "$INDU", "$COMPQ", "$COMPQ"]
+    assert len(alerts) == 6
 
 
 def test_get_emoji():
