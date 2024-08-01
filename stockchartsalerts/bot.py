@@ -1,5 +1,6 @@
 """Send alerts from stockcharts.com to other places."""
 
+import logging
 from datetime import datetime, time, timedelta
 
 import httpx
@@ -9,6 +10,8 @@ from dateutil.parser import parse
 from discord_webhook import DiscordWebhook
 
 from stockchartsalerts.config import DISCORD_WEBHOOK, MINUTES_BETWEEN_RUNS
+
+log = logging.getLogger(__name__)
 
 
 def get_alerts() -> list:
@@ -50,6 +53,8 @@ def get_emoji(alert: dict) -> str:
 
 def send_alert_to_discord(alert: dict) -> None:
     """Send a news item to a Discord webhook."""
+
+    log.info(f"Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
 
     webhook = DiscordWebhook(
         url=DISCORD_WEBHOOK,
