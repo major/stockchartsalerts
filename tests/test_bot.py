@@ -106,12 +106,17 @@ def test_get_emoji():
 def test_send_alert_to_discord():
     """Verify that we send the alert to Discord."""
     with mock.patch("stockchartsalerts.bot.DiscordWebhook") as mock_discord:
-        bot.send_alert_to_discord({"alert": "Test alert", "bearish": "no", "lastfired": "31 Jul 2024, 12:33pm"})
+        bot.send_alert_to_discord({
+            "alert": "Test alert",
+            "bearish": "no",
+            "lastfired": "31 Jul 2024, 12:33pm",
+            "symbol": "$COMPQ",
+        })
         mock_discord.assert_called_once_with(
             url=bot.DISCORD_WEBHOOK,
             rate_limit_retry=True,
-            username="StockCharts Alert",
+            username="$COMPQ",
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-            content="💚 **Test alert**",
+            content="💚  Test alert",
         )
         mock_discord.return_value.execute.assert_called_once()

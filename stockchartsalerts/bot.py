@@ -59,9 +59,9 @@ def send_alert_to_discord(alert: dict) -> None:
     webhook = DiscordWebhook(
         url=DISCORD_WEBHOOK,
         rate_limit_retry=True,
-        username="StockCharts Alert",
+        username=alert["symbol"],
         avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-        content=f"{get_emoji(alert)} **{alert["alert"]}**",
+        content=f"{get_emoji(alert)}  {alert["alert"]}",
     )
 
     webhook.execute()
