@@ -110,7 +110,8 @@ def test_send_alert_to_discord():
         mock_discord.assert_called_once_with(
             url=bot.DISCORD_WEBHOOK,
             rate_limit_retry=True,
-            username="💚",
-            content="Test alert",
+            username="StockCharts Alert",
+            avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
+            content="💚 **Test alert**",
         )
         mock_discord.return_value.execute.assert_called_once()
