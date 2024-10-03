@@ -93,6 +93,11 @@ def test_get_alerts(httpx_mock):
     alerts = bot.get_alerts()
     assert alerts == SAMPLE_ALERTS
 
+    httpx_mock.add_response(
+        url="https://stockcharts.com/j-sum/sum?cmd=alert",
+        json=SAMPLE_ALERTS,
+    )
+
     alerts = bot.get_alerts()
     assert len(alerts) == 6
 
