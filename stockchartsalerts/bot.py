@@ -7,7 +7,7 @@ import httpx
 import pytz
 from dateutil import tz
 from dateutil.parser import parse
-from discord_webhook import DiscordWebhook
+from discord_webhook import DiscordWebhook  # type: ignore
 
 from stockchartsalerts.config import DISCORD_WEBHOOK, MINUTES_BETWEEN_RUNS
 
@@ -61,7 +61,7 @@ def send_alert_to_discord(alert: dict) -> None:
         rate_limit_retry=True,
         username=alert["symbol"],
         avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-        content=f"{get_emoji(alert)}  {alert["alert"]}",
+        content=f"{get_emoji(alert)}  {alert['alert']}",
     )
 
     webhook.execute()
