@@ -7,7 +7,7 @@ import httpx
 import pytz
 from dateutil import tz
 from dateutil.parser import parse
-from discord_webhook import DiscordWebhook  # type: ignore
+from discord_webhook import DiscordWebhook
 
 from stockchartsalerts.config import DISCORD_WEBHOOK, MINUTES_BETWEEN_RUNS
 
@@ -35,9 +35,13 @@ def get_new_alerts() -> list:
 
     # We need the "lastfired" date parsed in the Eastern US time zone since that's
     # what stockcharts.com uses.
-    default_date = datetime.combine(datetime.now(), time(0, tzinfo=tz.gettz("America/New_York")))
+    default_date = datetime.combine(
+        datetime.now(), time(0, tzinfo=tz.gettz("America/New_York"))
+    )
 
-    return [x for x in alerts if parse(x["lastfired"], default=default_date) > previous_run]
+    return [
+        x for x in alerts if parse(x["lastfired"], default=default_date) > previous_run
+    ]
 
 
 def filter_alerts(alerts: list) -> list:

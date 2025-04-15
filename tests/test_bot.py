@@ -7,7 +7,12 @@ import freezegun
 from stockchartsalerts import bot
 
 SAMPLE_ALERTS = [
-    {"alert": "There are no alerts today", "newalert": "yes", "bearish": "", "lastfired": "1 Aug 2024, 8:11 AM ET"},
+    {
+        "alert": "There are no alerts today",
+        "newalert": "yes",
+        "bearish": "",
+        "lastfired": "1 Aug 2024, 8:11 AM ET",
+    },
     {
         "symbol": "$BPSPX",
         "alertpaused": "no",
