@@ -1,6 +1,6 @@
 
 # From https://fastapi.tiangolo.com/deployment/docker/#docker-image-with-poetry
-FROM docker.io/library/python:3.13@sha256:9a4c72e547e3e21c5325a53289a52a21cd6f737358b2f83035c860647547051b
+FROM docker.io/library/python:3.13@sha256:a6af772cf98267c48c145928cbeb35bd8e89b610acd70f93e3e8ac3e96c92af8
 WORKDIR /app
 
 RUN pip install -U pip poetry
