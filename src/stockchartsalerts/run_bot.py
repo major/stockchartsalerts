@@ -19,7 +19,8 @@ def send_alerts() -> None:
         bot.send_alert_to_discord(alert)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Main function to run the bot."""
     logging.info("🚀 Running Alerts Bot")
 
     send_alerts()
@@ -28,3 +29,7 @@ if __name__ == "__main__":
     while True:
         run_pending()
         sleep(1)
+
+
+if __name__ == "__main__":
+    main()
