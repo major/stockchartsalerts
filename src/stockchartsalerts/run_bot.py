@@ -24,12 +24,39 @@ def main() -> None:
     logging.info("🚀 Running Alerts Bot")
     logging.info(f"📦 Version: {GIT_BRANCH}@{GIT_COMMIT}")
 
-    send_alerts()
+    # Run initial alerts check
+    try:
+        send_alerts()
+    except Exception as e:
+        logging.error(f"Error during initial alert check: {e}", exc_info=True)
 
-    # Run the schedule loop.
+    # Run the schedule loop with error protection
+    consecutive_errors = 0
+    max_consecutive_errors = 5
+
     while True:
-        run_pending()
-        sleep(1)
+        try:
+            run_pending()
+            consecutive_errors = 0  # Reset on success
+            sleep(1)
+        except KeyboardInterrupt:
+            logging.info("⏹️  Shutting down gracefully...")
+            break
+        except Exception as e:
+            consecutive_errors += 1
+            logging.error(
+                f"Error in scheduler loop (consecutive: {consecutive_errors}): {e}",
+                exc_info=True,
+            )
+
+            # If too many consecutive errors, back off longer
+            if consecutive_errors >= max_consecutive_errors:
+                logging.warning(
+                    f"⚠️  {consecutive_errors} consecutive errors, backing off for 5 minutes..."
+                )
+                sleep(300)  # 5 minute backoff
+            else:
+                sleep(60)  # 1 minute backoff on errors
 
 
 if __name__ == "__main__":

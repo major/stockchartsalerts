@@ -116,6 +116,11 @@ def test_get_emoji():
 def test_send_alert_to_discord():
     """Verify that we send the alert to Discord."""
     with mock.patch("stockchartsalerts.bot.DiscordWebhook") as mock_discord:
+        # Mock the response to have a successful status code
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_discord.return_value.execute.return_value = mock_response
+
         bot.send_alert_to_discord({
             "alert": "Test alert",
             "bearish": "no",
