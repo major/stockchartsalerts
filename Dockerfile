@@ -22,4 +22,4 @@ ARG GIT_BRANCH=unknown
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_BRANCH=${GIT_BRANCH}
 
-CMD ["uv", "run", "python", "-m", "stockchartsalerts.run_bot"]
+CMD [".venv/bin/python", "-m", "stockchartsalerts.run_bot"]
