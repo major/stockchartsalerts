@@ -30,8 +30,6 @@ htmlcov/
 
 # Documentation
 docs/
-*.md
-!README.md
 
 # CI/CD (already in git, no need in image)
 .pre-commit-config.yaml

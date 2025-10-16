@@ -5,13 +5,16 @@ WORKDIR /app
 
 # Copy dependency files first for better layer caching
 # This layer only rebuilds when dependencies change
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies - this layer is cached unless dependency files change
-RUN uv sync --locked --no-dev
+# Install dependencies without the project itself - this layer is cached unless dependency files change
+RUN uv sync --locked --no-dev --no-install-project
 
 # Copy source code - this layer rebuilds on any code change
 COPY src ./src
+
+# Install the project now that source code is available
+RUN uv sync --locked --no-dev
 
 # Capture git commit and branch at build time
 ARG GIT_COMMIT=unknown
