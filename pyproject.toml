@@ -11,6 +11,7 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.2",
     "schedule>=1.2.2",
+    "sentry-sdk>=2.0.0",
 ]
 
 [tool.poetry.group.dev.dependencies]

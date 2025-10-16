@@ -3,6 +3,13 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.3@sha256:ecfea7316b266ba82a5e9efb052339ca41
 
 ADD . /app
 WORKDIR /app
+
+# Capture git commit and branch at build time
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+
 RUN uv sync --locked
 
 CMD ["uv", "run", "run-bot"]
