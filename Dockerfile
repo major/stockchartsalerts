@@ -12,4 +12,4 @@ ENV GIT_BRANCH=${GIT_BRANCH}
 
 RUN uv sync --locked
 
-CMD ["uv", "run", "run-bot"]
+CMD ["uv", "run", "python", "-m", "stockchartsalerts.run_bot"]
