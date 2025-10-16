@@ -33,7 +33,9 @@ def mask_webhook_url(url: str) -> str:
         token = parts[-1]
 
         # Show first 4 and last 4 chars of ID and token
-        masked_id = f"{webhook_id[:4]}...{webhook_id[-4:]}" if len(webhook_id) > 8 else "***"
+        masked_id = (
+            f"{webhook_id[:4]}...{webhook_id[-4:]}" if len(webhook_id) > 8 else "***"
+        )
         masked_token = f"{token[:4]}...{token[-4:]}" if len(token) > 8 else "***"
 
         return f"https://discord.com/api/webhooks/{masked_id}/{masked_token}"
@@ -64,7 +66,9 @@ def mask_sentry_dsn(dsn: str) -> str:
         if "@" in dsn:
             protocol_and_key, rest = dsn.split("@", 1)
             # Show first 4 chars of key
-            key_part = protocol_and_key.split("//", 1)[1] if "//" in protocol_and_key else ""
+            key_part = (
+                protocol_and_key.split("//", 1)[1] if "//" in protocol_and_key else ""
+            )
             masked_key = f"{key_part[:4]}****" if len(key_part) > 4 else "****"
             return f"https://{masked_key}@{rest}"
         return "invalid-dsn-format ⚠️"

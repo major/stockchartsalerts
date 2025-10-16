@@ -72,6 +72,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Stock Charts Alerts Bot
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Checkout selfhosted repository
         if: github.ref == 'refs/heads/main'
