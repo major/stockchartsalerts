@@ -1,6 +1,6 @@
 """Configuration settings."""
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # Bot Configuration
     minutes_between_runs: int = Field(
         default=5,
+        ge=1,  # Must be at least 1 minute
+        le=1440,  # Max 24 hours
         description="Minutes to wait between alert checks",
         alias="MINUTES_BETWEEN_RUNS",
     )
@@ -23,6 +25,7 @@ class Settings(BaseSettings):
     # Discord Configuration
     discord_webhook: str = Field(
         default="missing",
+        min_length=1,
         description="Discord webhook URL for sending alerts",
         alias="DISCORD_WEBHOOK",
     )
@@ -51,25 +54,19 @@ class Settings(BaseSettings):
         alias="GIT_BRANCH",
     )
 
+    @field_validator("discord_webhook")
+    @classmethod
+    def validate_discord_webhook(cls, v: str) -> str:
+        """Validate Discord webhook URL format."""
+        if v != "missing" and not v.startswith("https://"):
+            raise ValueError("Discord webhook must start with https://")
+        return v
+
 
 # Create a singleton instance
 settings = Settings()
 
-# Export individual settings for backward compatibility
-MINUTES_BETWEEN_RUNS: int = settings.minutes_between_runs
-DISCORD_WEBHOOK: str = settings.discord_webhook
-SENTRY_DSN: str = settings.sentry_dsn
-SENTRY_ENVIRONMENT: str = settings.sentry_environment
-GIT_COMMIT: str = settings.git_commit
-GIT_BRANCH: str = settings.git_branch
-
 __all__ = [
     "Settings",
     "settings",
-    "MINUTES_BETWEEN_RUNS",
-    "DISCORD_WEBHOOK",
-    "SENTRY_DSN",
-    "SENTRY_ENVIRONMENT",
-    "GIT_COMMIT",
-    "GIT_BRANCH",
 ]

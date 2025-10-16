@@ -10,7 +10,7 @@ from dateutil import tz
 from dateutil.parser import parse
 from discord_webhook import DiscordWebhook
 
-from stockchartsalerts.config import DISCORD_WEBHOOK, MINUTES_BETWEEN_RUNS
+from stockchartsalerts.config import settings
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,9 @@ def get_new_alerts() -> list:
 
     # Get the time of the previous run in Eastern time.
     eastern_time = pytz.timezone("America/New_York")
-    previous_run = datetime.now(eastern_time) - timedelta(minutes=MINUTES_BETWEEN_RUNS)
+    previous_run = datetime.now(eastern_time) - timedelta(
+        minutes=settings.minutes_between_runs
+    )
 
     # We need the "lastfired" date parsed in the Eastern US time zone since that's
     # what stockcharts.com uses.
@@ -105,7 +107,7 @@ def send_alert_to_discord(alert: dict) -> None:
     log.info(f"Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
 
     webhook = DiscordWebhook(
-        url=DISCORD_WEBHOOK,
+        url=settings.discord_webhook,
         rate_limit_retry=True,  # Library handles rate limiting automatically
         username=alert["symbol"],
         avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",

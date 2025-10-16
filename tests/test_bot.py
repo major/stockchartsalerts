@@ -5,6 +5,7 @@ from unittest import mock
 import freezegun
 
 from stockchartsalerts import bot
+from stockchartsalerts.config import settings
 
 SAMPLE_ALERTS = [
     {
@@ -128,10 +129,111 @@ def test_send_alert_to_discord():
             "symbol": "$COMPQ",
         })
         mock_discord.assert_called_once_with(
-            url=bot.DISCORD_WEBHOOK,
+            url=settings.discord_webhook,
             rate_limit_retry=True,
             username="$COMPQ",
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
             content="💚  Test alert",
         )
+        mock_discord.return_value.execute.assert_called_once()
+
+
+def test_get_alerts_http_error_retries_then_returns_empty(httpx_mock):
+    """Test that get_alerts retries on HTTP errors and returns empty list."""
+    # Mock 3 failures
+    for _ in range(3):
+        httpx_mock.add_response(
+            url="https://stockcharts.com/j-sum/sum?cmd=alert",
+            status_code=500,
+        )
+
+    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+        alerts = bot.get_alerts()
+
+    assert alerts == []  # Should return empty list after retries
+
+
+def test_get_alerts_timeout_retries_then_returns_empty(httpx_mock):
+    """Test that get_alerts retries on timeout and returns empty list."""
+    import httpx
+
+    # Mock 3 timeouts
+    httpx_mock.add_exception(httpx.TimeoutException("Connection timeout"))
+    httpx_mock.add_exception(httpx.TimeoutException("Connection timeout"))
+    httpx_mock.add_exception(httpx.TimeoutException("Connection timeout"))
+
+    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+        alerts = bot.get_alerts()
+
+    assert alerts == []  # Should return empty list after retries
+
+
+def test_get_alerts_network_error_retries_then_returns_empty(httpx_mock):
+    """Test that get_alerts retries on network errors and returns empty list."""
+    import httpx
+
+    # Mock 3 network errors
+    httpx_mock.add_exception(httpx.ConnectError("Connection refused"))
+    httpx_mock.add_exception(httpx.ConnectError("Connection refused"))
+    httpx_mock.add_exception(httpx.ConnectError("Connection refused"))
+
+    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+        alerts = bot.get_alerts()
+
+    assert alerts == []  # Should return empty list after retries
+
+
+def test_get_alerts_succeeds_after_retry(httpx_mock):
+    """Test that get_alerts succeeds after initial failures."""
+    import httpx
+
+    # First two requests fail, third succeeds
+    httpx_mock.add_exception(httpx.ConnectError("Connection refused"))
+    httpx_mock.add_exception(httpx.TimeoutException("Timeout"))
+    httpx_mock.add_response(
+        url="https://stockcharts.com/j-sum/sum?cmd=alert",
+        json=SAMPLE_ALERTS,
+    )
+
+    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+        alerts = bot.get_alerts()
+
+    assert alerts == SAMPLE_ALERTS  # Should succeed on third try
+
+
+def test_send_alert_to_discord_error_status_code():
+    """Test Discord webhook with error status code."""
+    with mock.patch("stockchartsalerts.bot.DiscordWebhook") as mock_discord:
+        # Mock error response
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 400
+        mock_discord.return_value.execute.return_value = mock_response
+
+        # Should not raise an exception, just log the error
+        bot.send_alert_to_discord({
+            "alert": "Test alert",
+            "bearish": "no",
+            "lastfired": "31 Jul 2024, 12:33pm",
+            "symbol": "$COMPQ",
+        })
+
+        # Verify webhook was called
+        mock_discord.return_value.execute.assert_called_once()
+
+
+def test_send_alert_to_discord_exception():
+    """Test Discord webhook handles exceptions gracefully."""
+    with mock.patch("stockchartsalerts.bot.DiscordWebhook") as mock_discord:
+        # Mock exception
+        mock_discord.return_value.execute.side_effect = Exception("Network error")
+
+        # Should not raise an exception, just log the error
+        bot.send_alert_to_discord({
+            "alert": "Test alert",
+            "bearish": "no",
+            "lastfired": "31 Jul 2024, 12:33pm",
+            "symbol": "$COMPQ",
+        })
+
+        # Verify webhook was called
         mock_discord.return_value.execute.assert_called_once()
