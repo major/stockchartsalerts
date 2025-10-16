@@ -5,9 +5,8 @@ import sys
 import sentry_sdk
 from loguru import logger
 
-from stockchartsalerts.config import settings
-
-# Configure loguru for clean, colored output
+# Configure loguru for clean, colored output BEFORE importing config
+# (config module logs settings on import, so we need logger configured first)
 logger.remove()  # Remove default handler
 logger.add(
     sys.stdout,
@@ -15,6 +14,8 @@ logger.add(
     level="INFO",
     colorize=True,
 )
+
+from stockchartsalerts.config import settings
 
 # Initialize Sentry if DSN is provided
 if settings.sentry_dsn:
