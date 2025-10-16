@@ -1,11 +1,20 @@
 """Top level package."""
 
-import logging
 import sys
 
 import sentry_sdk
+from loguru import logger
 
 from stockchartsalerts.config import settings
+
+# Configure loguru for clean, colored output
+logger.remove()  # Remove default handler
+logger.add(
+    sys.stdout,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+    level="INFO",
+    colorize=True,
+)
 
 # Initialize Sentry if DSN is provided
 if settings.sentry_dsn:
@@ -19,9 +28,3 @@ if settings.sentry_dsn:
         # Capture 100% of errors
         profiles_sample_rate=1.0,
     )
-
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    format="%(asctime)s;%(levelname)s;%(message)s",
-)

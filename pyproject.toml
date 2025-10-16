@@ -8,11 +8,13 @@ requires-python = ">=3.13,<4.0"
 dependencies = [
     "discord-webhook>=1.4.1",
     "httpx>=0.28.1",
+    "loguru>=0.7.0",
     "pydantic-settings>=2.0.0",
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.2",
     "schedule>=1.2.2",
     "sentry-sdk>=2.0.0",
+    "tenacity>=9.0.0",
 ]
 
 [tool.poetry.group.dev.dependencies]

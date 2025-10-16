@@ -1,72 +1,64 @@
 """Send alerts from stockcharts.com to other places."""
 
-import logging
 from datetime import datetime, time, timedelta
-from time import sleep
 
 import httpx
 import pytz
 from dateutil import tz
 from dateutil.parser import parse
 from discord_webhook import DiscordWebhook
+from loguru import logger
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from stockchartsalerts.config import settings
 
-log = logging.getLogger(__name__)
-
-# Constants for retry logic
-MAX_RETRIES = 3
-RETRY_DELAY = 2  # seconds
+# HTTP timeout constant
 HTTP_TIMEOUT = 30.0  # seconds
 
 
-def get_alerts() -> list:
-    """Get alerts from stockcharts.com with retry logic."""
+def _log_retry(retry_state):
+    """Log retry attempts."""
+    exception = retry_state.outcome.exception() if retry_state.outcome else "Unknown"
+    logger.warning(
+        f"⚠️  Retrying get_alerts (attempt {retry_state.attempt_number}/3) after error: {exception}"
+    )
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=10),
+    retry=retry_if_exception_type((httpx.HTTPError, httpx.TimeoutException)),
+    before_sleep=_log_retry,
+)
+def _fetch_alerts() -> list:
+    """Fetch alerts with automatic retry - internal function."""
     headers = {
         "Referer": "https://stockcharts.com/freecharts/alertsummary.html",
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0",
     }
 
-    last_error = None
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            resp = httpx.get(
-                "https://stockcharts.com/j-sum/sum?cmd=alert",
-                headers=headers,
-                timeout=HTTP_TIMEOUT,
-                follow_redirects=True,
-            )
-            resp.raise_for_status()
-            return list(resp.json())
-        except httpx.HTTPStatusError as e:
-            last_error = e
-            log.warning(
-                f"HTTP error fetching alerts (attempt {attempt}/{MAX_RETRIES}): "
-                f"Status {e.response.status_code}"
-            )
-        except httpx.TimeoutException as e:
-            last_error = e
-            log.warning(
-                f"Timeout fetching alerts (attempt {attempt}/{MAX_RETRIES}): {e}"
-            )
-        except httpx.RequestError as e:
-            last_error = e
-            log.warning(
-                f"Network error fetching alerts (attempt {attempt}/{MAX_RETRIES}): {e}"
-            )
-        except Exception as e:
-            last_error = e
-            log.warning(
-                f"Unexpected error fetching alerts (attempt {attempt}/{MAX_RETRIES}): {e}"
-            )
+    resp = httpx.get(
+        "https://stockcharts.com/j-sum/sum?cmd=alert",
+        headers=headers,
+        timeout=HTTP_TIMEOUT,
+        follow_redirects=True,
+    )
+    resp.raise_for_status()
+    return list(resp.json())
 
-        # Don't sleep after the last attempt
-        if attempt < MAX_RETRIES:
-            sleep(RETRY_DELAY * attempt)  # Exponential backoff
 
-    # All retries failed
-    log.error(f"Failed to fetch alerts after {MAX_RETRIES} attempts: {last_error}")
-    return []  # Return empty list instead of crashing
+def get_alerts() -> list:
+    """Get alerts from stockcharts.com, returns empty list on failure."""
+    try:
+        return _fetch_alerts()
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch alerts after all retries: {e}")
+        return []  # Return empty list instead of crashing
 
 
 def get_new_alerts() -> list:
@@ -104,7 +96,7 @@ def get_emoji(alert: dict) -> str:
 
 def send_alert_to_discord(alert: dict) -> None:
     """Send a news item to a Discord webhook."""
-    log.info(f"Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
+    logger.info(f"📤 Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
 
     webhook = DiscordWebhook(
         url=settings.discord_webhook,
@@ -117,11 +109,11 @@ def send_alert_to_discord(alert: dict) -> None:
     try:
         response = webhook.execute()
         if response.status_code >= 200 and response.status_code < 300:
-            log.info(f"✅ Alert sent successfully: {alert['symbol']}")
+            logger.info(f"✅ Alert sent successfully: {alert['symbol']}")
         else:
-            log.error(
+            logger.error(
                 f"❌ Discord webhook failed: {alert['symbol']} - "
                 f"Status {response.status_code}"
             )
     except Exception as e:
-        log.error(f"❌ Error sending alert to Discord: {alert['symbol']} - {e}")
+        logger.error(f"❌ Error sending alert to Discord: {alert['symbol']} - {e}")

@@ -3,6 +3,7 @@
 from unittest import mock
 
 import freezegun
+from tenacity import wait_none
 
 from stockchartsalerts import bot
 from stockchartsalerts.config import settings
@@ -147,7 +148,8 @@ def test_get_alerts_http_error_retries_then_returns_empty(httpx_mock):
             status_code=500,
         )
 
-    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+    # Patch tenacity's wait to make test instant
+    with mock.patch.object(bot._fetch_alerts.retry, "wait", wait_none()):
         alerts = bot.get_alerts()
 
     assert alerts == []  # Should return empty list after retries
@@ -162,7 +164,8 @@ def test_get_alerts_timeout_retries_then_returns_empty(httpx_mock):
     httpx_mock.add_exception(httpx.TimeoutException("Connection timeout"))
     httpx_mock.add_exception(httpx.TimeoutException("Connection timeout"))
 
-    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+    # Patch tenacity's wait to make test instant
+    with mock.patch.object(bot._fetch_alerts.retry, "wait", wait_none()):
         alerts = bot.get_alerts()
 
     assert alerts == []  # Should return empty list after retries
@@ -177,7 +180,8 @@ def test_get_alerts_network_error_retries_then_returns_empty(httpx_mock):
     httpx_mock.add_exception(httpx.ConnectError("Connection refused"))
     httpx_mock.add_exception(httpx.ConnectError("Connection refused"))
 
-    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+    # Patch tenacity's wait to make test instant
+    with mock.patch.object(bot._fetch_alerts.retry, "wait", wait_none()):
         alerts = bot.get_alerts()
 
     assert alerts == []  # Should return empty list after retries
@@ -195,7 +199,8 @@ def test_get_alerts_succeeds_after_retry(httpx_mock):
         json=SAMPLE_ALERTS,
     )
 
-    with mock.patch("stockchartsalerts.bot.sleep"):  # Speed up test
+    # Patch tenacity's wait to make test instant
+    with mock.patch.object(bot._fetch_alerts.retry, "wait", wait_none()):
         alerts = bot.get_alerts()
 
     assert alerts == SAMPLE_ALERTS  # Should succeed on third try
