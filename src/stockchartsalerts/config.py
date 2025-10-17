@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     )
 
     # Discord Configuration
-    discord_webhook: str = Field(
+    discord_webhook_url: str = Field(
         min_length=1,
         description="Discord webhook URL for sending alerts",
     )
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
         """Log all configuration settings with sensitive values masked."""
         logger.info("⚙️  Configuration Settings:")
         logger.info(f"  📊 minutes_between_runs: {self.minutes_between_runs}")
-        logger.info(f"  🔔 discord_webhook: {self.discord_webhook}")
+        logger.info(f"  🔔 discord_webhook: {self.discord_webhook_url}")
         logger.info(f"  🐛 sentry_dsn: {self.sentry_dsn}")
         logger.info(f"  🌍 sentry_environment: {self.sentry_environment}")
         logger.info(f"  📝 git_commit: {self.git_commit}")

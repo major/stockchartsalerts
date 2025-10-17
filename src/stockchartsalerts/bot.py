@@ -99,7 +99,7 @@ def send_alert_to_discord(alert: dict) -> None:
     logger.info(f"📤 Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
 
     webhook = DiscordWebhook(
-        url=get_settings().discord_webhook,
+        url=get_settings().discord_webhook_url,
         rate_limit_retry=True,  # Library handles rate limiting automatically
         username=alert["symbol"],
         avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
