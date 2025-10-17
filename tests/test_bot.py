@@ -12,13 +12,31 @@ from stockchartsalerts.config import get_settings
 
 @pytest.fixture(autouse=True)
 def mock_settings(monkeypatch):
-    """Mock settings for all tests by setting required environment variables."""
-    monkeypatch.setenv("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/123/abc")
-    # Reset the settings singleton between tests
+    """Mock settings for all tests by directly setting the settings singleton."""
+    # Import here to avoid circular imports
     import stockchartsalerts.config
+    from stockchartsalerts.config import Settings
 
+    # Reset the settings singleton before the test
     stockchartsalerts.config._settings = None
+
+    # Set environment variables for Settings to read
+    monkeypatch.setenv(
+        "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/123/abc"
+    )
+
+    # Create Settings object directly with the env var
+    # This bypasses the .env file requirement
+    test_settings = Settings(
+        discord_webhook_url="https://discord.com/api/webhooks/123/abc",
+        _env_file=None,  # Disable .env file reading in tests
+    )
+
+    # Set the singleton directly
+    stockchartsalerts.config._settings = test_settings
+
     yield
+
     # Clean up after test
     stockchartsalerts.config._settings = None
 
@@ -145,7 +163,7 @@ def test_send_alert_to_discord():
             "symbol": "$COMPQ",
         })
         mock_discord.assert_called_once_with(
-            url=get_settings().discord_webhook,
+            url=get_settings().discord_webhook_url,
             rate_limit_retry=True,
             username="$COMPQ",
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
