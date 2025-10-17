@@ -1,7 +1,7 @@
 """Configuration settings."""
 
 from loguru import logger
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,14 +47,6 @@ class Settings(BaseSettings):
         default="unknown",
         description="Git branch name",
     )
-
-    @field_validator("discord_webhook")
-    @classmethod
-    def validate_discord_webhook(cls, v: str) -> str:
-        """Validate Discord webhook URL format."""
-        if not v.startswith("https://"):
-            raise ValueError("Discord webhook must start with https://")
-        return v
 
     def log_settings(self) -> None:
         """Log all configuration settings with sensitive values masked."""
