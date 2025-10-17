@@ -15,7 +15,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from stockchartsalerts.config import settings
+from stockchartsalerts.config import get_settings
 
 # HTTP timeout constant
 HTTP_TIMEOUT = 30.0  # seconds
@@ -69,7 +69,7 @@ def get_new_alerts() -> list:
     # Get the time of the previous run in Eastern time.
     eastern_time = pytz.timezone("America/New_York")
     previous_run = datetime.now(eastern_time) - timedelta(
-        minutes=settings.minutes_between_runs
+        minutes=get_settings().minutes_between_runs
     )
 
     # We need the "lastfired" date parsed in the Eastern US time zone since that's
@@ -99,7 +99,7 @@ def send_alert_to_discord(alert: dict) -> None:
     logger.info(f"📤 Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
 
     webhook = DiscordWebhook(
-        url=settings.discord_webhook,
+        url=get_settings().discord_webhook,
         rate_limit_retry=True,  # Library handles rate limiting automatically
         username=alert["symbol"],
         avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",

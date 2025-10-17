@@ -3,10 +3,25 @@
 from unittest import mock
 
 import freezegun
+import pytest
 from tenacity import wait_none
 
 from stockchartsalerts import bot
-from stockchartsalerts.config import settings
+from stockchartsalerts.config import get_settings
+
+
+@pytest.fixture(autouse=True)
+def mock_settings(monkeypatch):
+    """Mock settings for all tests by setting required environment variables."""
+    monkeypatch.setenv("DISCORD_WEBHOOK", "https://discord.com/api/webhooks/123/abc")
+    # Reset the settings singleton between tests
+    import stockchartsalerts.config
+
+    stockchartsalerts.config._settings = None
+    yield
+    # Clean up after test
+    stockchartsalerts.config._settings = None
+
 
 SAMPLE_ALERTS = [
     {
@@ -130,7 +145,7 @@ def test_send_alert_to_discord():
             "symbol": "$COMPQ",
         })
         mock_discord.assert_called_once_with(
-            url=settings.discord_webhook,
+            url=get_settings().discord_webhook,
             rate_limit_retry=True,
             username="$COMPQ",
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",

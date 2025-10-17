@@ -3,14 +3,15 @@
 
 from time import sleep
 
+import sentry_sdk
 from loguru import logger
 from schedule import every, repeat, run_pending
 
 from stockchartsalerts import bot
-from stockchartsalerts.config import settings
+from stockchartsalerts.config import get_settings
 
 
-@repeat(every(settings.minutes_between_runs).minutes)
+@repeat(every(get_settings().minutes_between_runs).minutes)
 def send_alerts() -> None:
     """Send alerts to Discord."""
     alerts = bot.get_new_alerts()
@@ -21,6 +22,21 @@ def send_alerts() -> None:
 
 def main() -> None:
     """Main function to run the bot."""
+    settings = get_settings()
+
+    # Initialize Sentry if DSN is provided
+    if settings.sentry_dsn:
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.sentry_environment,
+            release=f"{settings.git_branch}@{settings.git_commit}",
+            # Set traces_sample_rate to 1.0 to capture 100% of transactions for tracing
+            # We recommend adjusting this value in production
+            traces_sample_rate=0.1,
+            # Capture 100% of errors
+            profiles_sample_rate=1.0,
+        )
+
     logger.info("🚀 Running Alerts Bot")
     logger.info(f"📦 Version: {settings.git_branch}@{settings.git_commit}")
 
