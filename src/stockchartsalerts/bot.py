@@ -95,25 +95,35 @@ def get_emoji(alert: dict) -> str:
 
 
 def send_alert_to_discord(alert: dict) -> None:
-    """Send a news item to a Discord webhook."""
+    """Send a news item to Discord webhook(s)."""
     logger.info(f"📤 Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
 
-    webhook = DiscordWebhook(
-        url=get_settings().discord_webhook_url,
-        rate_limit_retry=True,  # Library handles rate limiting automatically
-        username=alert["symbol"],
-        avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-        content=f"{get_emoji(alert)}  {alert['alert']}",
-    )
+    # Get all configured webhook URLs
+    webhook_urls = get_settings().get_discord_webhook_urls()
+    logger.info(f"🔗 Sending to {len(webhook_urls)} webhook(s)")
 
-    try:
-        response = webhook.execute()
-        if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"✅ Alert sent successfully: {alert['symbol']}")
-        else:
+    # Send to each webhook
+    for i, webhook_url in enumerate(webhook_urls, 1):
+        webhook = DiscordWebhook(
+            url=webhook_url,
+            rate_limit_retry=True,  # Library handles rate limiting automatically
+            username=alert["symbol"],
+            avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
+            content=f"{get_emoji(alert)}  {alert['alert']}",
+        )
+
+        try:
+            response = webhook.execute()
+            if response.status_code >= 200 and response.status_code < 300:
+                logger.info(
+                    f"✅ Alert sent successfully to webhook {i}/{len(webhook_urls)}: {alert['symbol']}"
+                )
+            else:
+                logger.error(
+                    f"❌ Discord webhook {i}/{len(webhook_urls)} failed: {alert['symbol']} - "
+                    f"Status {response.status_code}"
+                )
+        except Exception as e:
             logger.error(
-                f"❌ Discord webhook failed: {alert['symbol']} - "
-                f"Status {response.status_code}"
+                f"❌ Error sending alert to Discord webhook {i}/{len(webhook_urls)}: {alert['symbol']} - {e}"
             )
-    except Exception as e:
-        logger.error(f"❌ Error sending alert to Discord: {alert['symbol']} - {e}")

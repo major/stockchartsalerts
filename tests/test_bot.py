@@ -162,8 +162,10 @@ def test_send_alert_to_discord():
             "lastfired": "31 Jul 2024, 12:33pm",
             "symbol": "$COMPQ",
         })
+
+        # With single webhook URL, should be called once
         mock_discord.assert_called_once_with(
-            url=get_settings().discord_webhook_url,
+            url="https://discord.com/api/webhooks/123/abc",
             rate_limit_retry=True,
             username="$COMPQ",
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
@@ -275,3 +277,87 @@ def test_send_alert_to_discord_exception():
 
         # Verify webhook was called
         mock_discord.return_value.execute.assert_called_once()
+
+
+def test_send_alert_to_multiple_discord_webhooks(monkeypatch):
+    """Test sending alert to multiple Discord webhooks."""
+    # Import here to avoid circular imports
+    import stockchartsalerts.config
+    from stockchartsalerts.config import Settings
+
+    # Reset the settings singleton
+    stockchartsalerts.config._settings = None
+
+    # Clear environment variables to avoid conflicts with autouse fixture
+    monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
+
+    # Create Settings with multiple webhooks
+    test_settings = Settings(
+        discord_webhook_urls="https://discord.com/api/webhooks/1/abc,https://discord.com/api/webhooks/2/def",
+        _env_file=None,
+    )
+    stockchartsalerts.config._settings = test_settings
+
+    with mock.patch("stockchartsalerts.bot.DiscordWebhook") as mock_discord:
+        # Mock the response to have a successful status code
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_discord.return_value.execute.return_value = mock_response
+
+        bot.send_alert_to_discord({
+            "alert": "Test alert",
+            "bearish": "no",
+            "lastfired": "31 Jul 2024, 12:33pm",
+            "symbol": "$COMPQ",
+        })
+
+        # Should be called twice (once for each webhook)
+        assert mock_discord.call_count == 2
+
+        # Verify both webhook URLs were used
+        calls = [call.kwargs["url"] for call in mock_discord.call_args_list]
+        assert "https://discord.com/api/webhooks/1/abc" in calls
+        assert "https://discord.com/api/webhooks/2/def" in calls
+
+        # Verify execute was called twice
+        assert mock_discord.return_value.execute.call_count == 2
+
+
+def test_send_alert_to_mixed_discord_webhooks(monkeypatch):
+    """Test sending alert with both old and new webhook config (backward compat)."""
+    # Import here to avoid circular imports
+    import stockchartsalerts.config
+    from stockchartsalerts.config import Settings
+
+    # Reset the settings singleton
+    stockchartsalerts.config._settings = None
+
+    # Create Settings with BOTH discord_webhook_url and discord_webhook_urls
+    test_settings = Settings(
+        discord_webhook_url="https://discord.com/api/webhooks/old/xyz",
+        discord_webhook_urls="https://discord.com/api/webhooks/new1/abc,https://discord.com/api/webhooks/new2/def",
+        _env_file=None,
+    )
+    stockchartsalerts.config._settings = test_settings
+
+    with mock.patch("stockchartsalerts.bot.DiscordWebhook") as mock_discord:
+        # Mock the response to have a successful status code
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_discord.return_value.execute.return_value = mock_response
+
+        bot.send_alert_to_discord({
+            "alert": "Test alert",
+            "bearish": "no",
+            "lastfired": "31 Jul 2024, 12:33pm",
+            "symbol": "$COMPQ",
+        })
+
+        # Should be called 3 times (old URL + 2 new URLs)
+        assert mock_discord.call_count == 3
+
+        # Verify all three webhook URLs were used
+        calls = [call.kwargs["url"] for call in mock_discord.call_args_list]
+        assert "https://discord.com/api/webhooks/old/xyz" in calls
+        assert "https://discord.com/api/webhooks/new1/abc" in calls
+        assert "https://discord.com/api/webhooks/new2/def" in calls
