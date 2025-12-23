@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Run the alert bot."""
 
+import atexit
 from time import sleep
 
 import sentry_sdk
@@ -23,6 +24,10 @@ def send_alerts() -> None:
 def main() -> None:
     """Main function to run the bot."""
     settings = get_settings()
+
+    # Register cleanup handler to close HTTP client on shutdown.
+    # This ensures we don't leak connection pools when the container stops.
+    atexit.register(bot.cleanup)
 
     # Initialize Sentry if DSN is provided
     if settings.sentry_dsn:

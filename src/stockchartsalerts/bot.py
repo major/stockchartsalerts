@@ -20,6 +20,22 @@ from stockchartsalerts.config import get_settings
 # HTTP timeout constant
 HTTP_TIMEOUT = 30.0  # seconds
 
+# MEMORY LEAK FIX: Create a persistent httpx client that is reused across all requests.
+# Previously, httpx.get() was creating a new client on every call (every 5 minutes),
+# which accumulated unclosed connection pools, TCP connections, and buffers.
+# This caused OOMKilled errors in Kubernetes after running for hours/days.
+# Using a persistent client with connection pooling prevents this memory leak.
+_http_client = httpx.Client(
+    timeout=HTTP_TIMEOUT,
+    follow_redirects=True,
+    # Configure connection pool limits to prevent resource exhaustion
+    limits=httpx.Limits(
+        max_keepalive_connections=5,  # Keep only 5 persistent connections
+        max_connections=10,  # Max 10 total connections
+        keepalive_expiry=30.0,  # Close idle connections after 30s
+    ),
+)
+
 
 def _log_retry(retry_state):
     """Log retry attempts."""
@@ -42,11 +58,10 @@ def _fetch_alerts() -> list:
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0",
     }
 
-    resp = httpx.get(
+    # Use the persistent client instead of httpx.get() to prevent memory leaks
+    resp = _http_client.get(
         "https://stockcharts.com/j-sum/sum?cmd=alert",
         headers=headers,
-        timeout=HTTP_TIMEOUT,
-        follow_redirects=True,
     )
     resp.raise_for_status()
     return list(resp.json())
@@ -127,3 +142,15 @@ def send_alert_to_discord(alert: dict) -> None:
             logger.error(
                 f"❌ Error sending alert to Discord webhook {i}/{len(webhook_urls)}: {alert['symbol']} - {e}"
             )
+
+
+def cleanup() -> None:
+    """
+    Clean up resources on shutdown.
+
+    Properly closes the persistent HTTP client to release connection pools
+    and prevent resource leaks. While less critical in containerized environments
+    (OS cleans up on process exit), this ensures graceful shutdown.
+    """
+    logger.info("🧹 Cleaning up HTTP client...")
+    _http_client.close()
