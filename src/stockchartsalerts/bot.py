@@ -8,6 +8,7 @@ from dateutil import tz
 from dateutil.parser import parse
 from discord_webhook import DiscordWebhook
 from loguru import logger
+from pydantic import ValidationError
 from tenacity import (
     RetryError,
     retry,
@@ -17,6 +18,7 @@ from tenacity import (
 )
 
 from stockchartsalerts.config import get_settings
+from stockchartsalerts.models import Alert
 
 # HTTP timeout constant
 HTTP_TIMEOUT = 30.0  # seconds
@@ -68,6 +70,17 @@ def _fetch_alerts() -> list:
     return list(resp.json())
 
 
+def _normalize_alert(alert: Alert | dict) -> Alert | None:
+    if isinstance(alert, Alert):
+        return alert
+
+    try:
+        return Alert.model_validate(alert)
+    except ValidationError as exc:
+        logger.warning(f"⚠️  Skipping malformed alert payload: {exc}")
+        return None
+
+
 def get_alerts() -> list:
     """Get alerts from stockcharts.com, returns empty list on failure."""
     try:
@@ -77,7 +90,7 @@ def get_alerts() -> list:
         return []  # Return empty list instead of crashing
 
 
-def get_new_alerts() -> list:
+def get_new_alerts() -> list[dict]:
     """Return only new alerts"""
     alerts = get_alerts()
     alerts = filter_alerts(alerts)
@@ -94,22 +107,14 @@ def get_new_alerts() -> list:
         datetime.now(), time(0, tzinfo=tz.gettz("America/New_York"))
     )
 
-    new_alerts: list[dict] = []
+    new_alerts: list[Alert] = []
     for alert in alerts:
-        last_fired = alert.get("lastfired")
-        if not isinstance(last_fired, str):
-            logger.warning(
-                "⚠️  Skipping alert with invalid lastfired field: {}",
-                alert.get("symbol", "unknown"),
-            )
-            continue
-
         try:
-            fired_at = parse(last_fired, default=default_date)
+            fired_at = parse(alert.lastfired, default=default_date)
         except (TypeError, ValueError) as exc:
             logger.warning(
                 "⚠️  Failed to parse lastfired for {}: {}",
-                alert.get("symbol", "unknown"),
+                alert.symbol,
                 exc,
             )
             continue
@@ -117,31 +122,31 @@ def get_new_alerts() -> list:
         if fired_at > previous_run:
             new_alerts.append(alert)
 
-    return new_alerts
+    return [alert.model_dump() for alert in new_alerts]
 
 
-def filter_alerts(alerts: list) -> list:
+def filter_alerts(alerts: list[Alert | dict]) -> list[Alert]:
     """Filter out alerts that we don't want to send."""
     banned_strings = {"There are no alerts today"}
-    filtered_alerts: list[dict] = []
+    filtered_alerts: list[Alert] = []
 
     for alert in alerts:
-        alert_text = alert.get("alert")
-        if not isinstance(alert_text, str):
-            logger.warning(
-                "⚠️  Skipping alert without valid text: {}",
-                alert.get("symbol", "unknown"),
-            )
-            continue
-        if alert_text not in banned_strings:
-            filtered_alerts.append(alert)
+        normalized_alert = _normalize_alert(alert)
+        if normalized_alert and normalized_alert.alert not in banned_strings:
+            filtered_alerts.append(normalized_alert)
 
     return filtered_alerts
 
 
-def get_emoji(alert: dict) -> str:
+def get_emoji(alert: Alert | dict) -> str:
     """Return the emoji for the alert."""
-    return "🔴" if alert.get("bearish") == "yes" else "💚"
+    if isinstance(alert, dict):
+        return "🔴" if alert.get("bearish") == "yes" else "💚"
+
+    normalized_alert = _normalize_alert(alert)
+    if not normalized_alert:
+        return "💚"
+    return "🔴" if normalized_alert.bearish == "yes" else "💚"
 
 
 def format_discord_alert_text(alert_text: str) -> str:
@@ -153,16 +158,16 @@ def format_discord_alert_text(alert_text: str) -> str:
     return alert_text
 
 
-def send_alert_to_discord(alert: dict) -> None:
+def send_alert_to_discord(alert: Alert | dict) -> None:
     """Send a news item to Discord webhook(s)."""
-    alert_text = alert.get("alert")
-    if not isinstance(alert_text, str):
+    normalized_alert = _normalize_alert(alert)
+    if not normalized_alert:
         logger.error("❌ Skipping Discord send for malformed alert payload")
         return
 
-    symbol = str(alert.get("symbol", "UNKNOWN"))
-    last_fired = str(alert.get("lastfired", "unknown"))
-    logger.info(f"📤 Sending alert to Discord: {alert_text} @ {last_fired}")
+    logger.info(
+        f"📤 Sending alert to Discord: {normalized_alert.alert} @ {normalized_alert.lastfired}"
+    )
 
     # Get all configured webhook URLs
     webhook_urls = get_settings().get_discord_webhook_urls()
@@ -173,25 +178,25 @@ def send_alert_to_discord(alert: dict) -> None:
         webhook = DiscordWebhook(
             url=webhook_url,
             rate_limit_retry=True,  # Library handles rate limiting automatically
-            username=symbol,
+            username=normalized_alert.symbol,
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-            content=f"{get_emoji(alert)}  {format_discord_alert_text(alert_text)}",
+            content=f"{get_emoji(normalized_alert)}  {format_discord_alert_text(normalized_alert.alert)}",
         )
 
         try:
             response = webhook.execute()
             if response.status_code >= 200 and response.status_code < 300:
                 logger.info(
-                    f"✅ Alert sent successfully to webhook {i}/{len(webhook_urls)}: {symbol}"
+                    f"✅ Alert sent successfully to webhook {i}/{len(webhook_urls)}: {normalized_alert.symbol}"
                 )
             else:
                 logger.error(
-                    f"❌ Discord webhook {i}/{len(webhook_urls)} failed: {symbol} - "
+                    f"❌ Discord webhook {i}/{len(webhook_urls)} failed: {normalized_alert.symbol} - "
                     f"Status {response.status_code}"
                 )
         except Exception as e:
             logger.error(
-                f"❌ Error sending alert to Discord webhook {i}/{len(webhook_urls)}: {symbol} - {e}"
+                f"❌ Error sending alert to Discord webhook {i}/{len(webhook_urls)}: {normalized_alert.symbol} - {e}"
             )
 
 
