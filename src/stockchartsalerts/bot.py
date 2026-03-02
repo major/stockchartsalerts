@@ -109,6 +109,15 @@ def get_emoji(alert: dict) -> str:
     return "🔴" if alert["bearish"] == "yes" else "💚"
 
 
+def format_discord_alert_text(alert_text: str) -> str:
+    """Rewrite alert text for Discord when needed."""
+    prefix = "Dow crosses above "
+    if alert_text.startswith(prefix):
+        level = alert_text.removeprefix(prefix)
+        return f"THE DOW, THE DOW IS ABOVE {level}"
+    return alert_text
+
+
 def send_alert_to_discord(alert: dict) -> None:
     """Send a news item to Discord webhook(s)."""
     logger.info(f"📤 Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
@@ -124,7 +133,7 @@ def send_alert_to_discord(alert: dict) -> None:
             rate_limit_retry=True,  # Library handles rate limiting automatically
             username=alert["symbol"],
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-            content=f"{get_emoji(alert)}  {alert['alert']}",
+            content=f"{get_emoji(alert)}  {format_discord_alert_text(alert['alert'])}",
         )
 
         try:

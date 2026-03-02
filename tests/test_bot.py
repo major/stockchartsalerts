@@ -174,6 +174,30 @@ def test_send_alert_to_discord():
         mock_discord.return_value.execute.assert_called_once()
 
 
+def test_send_alert_to_discord_rewrites_dow_crosses_above():
+    """Verify Dow crosses above alerts are rewritten for Discord."""
+    with mock.patch("stockchartsalerts.bot.DiscordWebhook") as mock_discord:
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_discord.return_value.execute.return_value = mock_response
+
+        bot.send_alert_to_discord({
+            "alert": "Dow crosses above 41000",
+            "bearish": "no",
+            "lastfired": "31 Jul 2024, 12:33pm",
+            "symbol": "$INDU",
+        })
+
+        mock_discord.assert_called_once_with(
+            url="https://discord.com/api/webhooks/123/abc",
+            rate_limit_retry=True,
+            username="$INDU",
+            avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
+            content="💚  THE DOW, THE DOW IS ABOVE 41000",
+        )
+        mock_discord.return_value.execute.assert_called_once()
+
+
 def test_get_alerts_http_error_retries_then_returns_empty(httpx_mock):
     """Test that get_alerts retries on HTTP errors and returns empty list."""
     # Mock 3 failures
