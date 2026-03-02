@@ -9,6 +9,7 @@ from dateutil.parser import parse
 from discord_webhook import DiscordWebhook
 from loguru import logger
 from tenacity import (
+    RetryError,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
@@ -71,8 +72,8 @@ def get_alerts() -> list:
     """Get alerts from stockcharts.com, returns empty list on failure."""
     try:
         return _fetch_alerts()
-    except Exception as e:
-        logger.error(f"❌ Failed to fetch alerts after all retries: {e}")
+    except (RetryError, ValueError) as exc:
+        logger.exception(f"❌ Failed to fetch alerts after all retries: {exc}")
         return []  # Return empty list instead of crashing
 
 
@@ -93,20 +94,54 @@ def get_new_alerts() -> list:
         datetime.now(), time(0, tzinfo=tz.gettz("America/New_York"))
     )
 
-    return [
-        x for x in alerts if parse(x["lastfired"], default=default_date) > previous_run
-    ]
+    new_alerts: list[dict] = []
+    for alert in alerts:
+        last_fired = alert.get("lastfired")
+        if not isinstance(last_fired, str):
+            logger.warning(
+                "⚠️  Skipping alert with invalid lastfired field: {}",
+                alert.get("symbol", "unknown"),
+            )
+            continue
+
+        try:
+            fired_at = parse(last_fired, default=default_date)
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "⚠️  Failed to parse lastfired for {}: {}",
+                alert.get("symbol", "unknown"),
+                exc,
+            )
+            continue
+
+        if fired_at > previous_run:
+            new_alerts.append(alert)
+
+    return new_alerts
 
 
 def filter_alerts(alerts: list) -> list:
     """Filter out alerts that we don't want to send."""
-    banned_strings = ["There are no alerts today"]
-    return [x for x in alerts if x["alert"] not in banned_strings]
+    banned_strings = {"There are no alerts today"}
+    filtered_alerts: list[dict] = []
+
+    for alert in alerts:
+        alert_text = alert.get("alert")
+        if not isinstance(alert_text, str):
+            logger.warning(
+                "⚠️  Skipping alert without valid text: {}",
+                alert.get("symbol", "unknown"),
+            )
+            continue
+        if alert_text not in banned_strings:
+            filtered_alerts.append(alert)
+
+    return filtered_alerts
 
 
 def get_emoji(alert: dict) -> str:
     """Return the emoji for the alert."""
-    return "🔴" if alert["bearish"] == "yes" else "💚"
+    return "🔴" if alert.get("bearish") == "yes" else "💚"
 
 
 def format_discord_alert_text(alert_text: str) -> str:
@@ -120,7 +155,14 @@ def format_discord_alert_text(alert_text: str) -> str:
 
 def send_alert_to_discord(alert: dict) -> None:
     """Send a news item to Discord webhook(s)."""
-    logger.info(f"📤 Sending alert to Discord: {alert['alert']} @ {alert['lastfired']}")
+    alert_text = alert.get("alert")
+    if not isinstance(alert_text, str):
+        logger.error("❌ Skipping Discord send for malformed alert payload")
+        return
+
+    symbol = str(alert.get("symbol", "UNKNOWN"))
+    last_fired = str(alert.get("lastfired", "unknown"))
+    logger.info(f"📤 Sending alert to Discord: {alert_text} @ {last_fired}")
 
     # Get all configured webhook URLs
     webhook_urls = get_settings().get_discord_webhook_urls()
@@ -131,25 +173,25 @@ def send_alert_to_discord(alert: dict) -> None:
         webhook = DiscordWebhook(
             url=webhook_url,
             rate_limit_retry=True,  # Library handles rate limiting automatically
-            username=alert["symbol"],
+            username=symbol,
             avatar_url="https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
-            content=f"{get_emoji(alert)}  {format_discord_alert_text(alert['alert'])}",
+            content=f"{get_emoji(alert)}  {format_discord_alert_text(alert_text)}",
         )
 
         try:
             response = webhook.execute()
             if response.status_code >= 200 and response.status_code < 300:
                 logger.info(
-                    f"✅ Alert sent successfully to webhook {i}/{len(webhook_urls)}: {alert['symbol']}"
+                    f"✅ Alert sent successfully to webhook {i}/{len(webhook_urls)}: {symbol}"
                 )
             else:
                 logger.error(
-                    f"❌ Discord webhook {i}/{len(webhook_urls)} failed: {alert['symbol']} - "
+                    f"❌ Discord webhook {i}/{len(webhook_urls)} failed: {symbol} - "
                     f"Status {response.status_code}"
                 )
         except Exception as e:
             logger.error(
-                f"❌ Error sending alert to Discord webhook {i}/{len(webhook_urls)}: {alert['symbol']} - {e}"
+                f"❌ Error sending alert to Discord webhook {i}/{len(webhook_urls)}: {symbol} - {e}"
             )
 
 
