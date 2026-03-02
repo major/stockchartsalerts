@@ -131,16 +131,28 @@ class Settings(BaseSettings):
 
 
 _settings: Settings | None = None
+_cli_settings: Settings | None = None
 
 
-def get_settings() -> Settings:
+class CliSettings(Settings, cli_parse_args=True, cli_kebab_case=True):
+    pass
+
+
+def get_settings(parse_cli: bool = False, refresh: bool = False) -> Settings:
     """Get or create the settings singleton.
 
     Returns:
         Settings instance with configuration loaded from environment variables
     """
-    global _settings
-    if _settings is None:
+    global _settings, _cli_settings
+
+    if parse_cli:
+        if _cli_settings is None or refresh:
+            _cli_settings = CliSettings()  # pyright: ignore[reportCallIssue]
+            _cli_settings.log_settings()
+        return _cli_settings
+
+    if _settings is None or refresh:
         _settings = Settings()  # pyright: ignore[reportCallIssue]
         # Log all settings at startup with sensitive values masked
         _settings.log_settings()
@@ -148,6 +160,7 @@ def get_settings() -> Settings:
 
 
 __all__ = [
+    "CliSettings",
     "Settings",
     "get_settings",
 ]

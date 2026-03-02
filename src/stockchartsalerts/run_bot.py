@@ -6,13 +6,12 @@ from time import sleep
 
 import sentry_sdk
 from loguru import logger
-from schedule import every, repeat, run_pending
+from schedule import clear, every, run_pending
 
 from stockchartsalerts import bot
 from stockchartsalerts.config import get_settings
 
 
-@repeat(every(get_settings().minutes_between_runs).minutes)
 def send_alerts() -> None:
     """Send alerts to Discord."""
     alerts = bot.get_new_alerts()
@@ -21,9 +20,14 @@ def send_alerts() -> None:
         bot.send_alert_to_discord(alert)
 
 
+def configure_schedule(minutes_between_runs: int) -> None:
+    clear()
+    every(minutes_between_runs).minutes.do(send_alerts)
+
+
 def main() -> None:
     """Main function to run the bot."""
-    settings = get_settings()
+    settings = get_settings(parse_cli=True)
 
     # Register cleanup handler to close HTTP client on shutdown.
     # This ensures we don't leak connection pools when the container stops.
@@ -44,6 +48,8 @@ def main() -> None:
 
     logger.info("🚀 Running Alerts Bot")
     logger.info(f"📦 Version: {settings.git_branch}@{settings.git_commit}")
+
+    configure_schedule(settings.minutes_between_runs)
 
     # Run initial alerts check
     try:
