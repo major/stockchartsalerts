@@ -5,6 +5,7 @@
         ":automergeAll",
         "config:best-practices"
     ],
+    "platformAutomerge": true,
     "git-submodules": {
       "enabled": true
     }
