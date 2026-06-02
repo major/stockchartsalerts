@@ -8,7 +8,7 @@ StockCharts Alerts Bot: polls stockcharts.com predefined alerts, sends new ones 
 
 - Rust 1.96, edition 2024
 - Entry point: `cargo run` in development, `/usr/local/bin/stockchartsalerts` in the container
-- Container: `ghcr.io/major/stockchartsalerts:latest`
+- Container: `ghcr.io/major/stockchartsalerts:latest`, built from `Containerfile` with Red Hat hardened images
 
 ## Directory Layout
 
@@ -22,7 +22,7 @@ src/
   discord.rs      # Discord webhook payloads and posting
   error.rs        # thiserror error enum and Result alias
   http.rs         # shared reqwest client builder
-  stockcharts.rs  # StockCharts fetch client and retry behavior
+  stockcharts.rs  # StockCharts fetch client, headers, retry behavior, JSON decoding
   telemetry.rs    # tracing and optional Sentry initialization
 ```
 
@@ -71,7 +71,24 @@ Run `make all` for the full local check or `make test` for tests only.
 - Unit tests live inline in `#[cfg(test)]` modules.
 - HTTP mocking uses `mockito`.
 - Time-sensitive tests pass explicit Eastern Time timestamps instead of relying on wall-clock time.
+- Config tests should verify URL splitting, trimming, deduplication, required plural webhooks, and interval bounds.
 - Assertions verify graceful degradation, webhook deduplication, retry counts, and no crashes on transient failures.
+
+### Development Commands
+
+```bash
+make all
+cargo fmt --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+cargo build --locked
+```
+
+Run locally with:
+
+```bash
+DISCORD_WEBHOOK_URLS=https://discord.example/webhook cargo run --locked
+```
 
 ## CI/CD
 
@@ -96,6 +113,7 @@ All actions are SHA-pinned. Secrets: `GITHUB_TOKEN`, `SELFHOSTED_PAT`.
 
 ## Code Style
 
+- Rust 1.96, edition 2024.
 - `#![deny(missing_docs)]` at crate root.
 - Typed errors with `thiserror` and `crate::error::Result`.
 - Rustfmt formatting and clippy with warnings denied.

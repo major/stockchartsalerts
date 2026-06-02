@@ -33,4 +33,4 @@ DISCORD_WEBHOOK_URLS=https://discord.example/webhook cargo run --locked
 
 ## Container
 
-The GitHub Actions workflow builds `ghcr.io/major/stockchartsalerts:latest` with a Rust multi-stage Dockerfile. Build args `GIT_COMMIT` and `GIT_BRANCH` are preserved so Sentry releases are reported as `{git_branch}@{git_commit}`.
+The GitHub Actions workflow builds `ghcr.io/major/stockchartsalerts:latest` with a Rust multi-stage Containerfile based on Red Hat hardened images. Build args `GIT_COMMIT` and `GIT_BRANCH` are preserved so Sentry releases are reported as `{git_branch}@{git_commit}`.

@@ -1,3 +1,6 @@
+# Keep this as .dockerignore because GitHub Actions uses Docker Buildx even though
+# the build file is named Containerfile.
+
 # Git
 .git
 .gitignore
