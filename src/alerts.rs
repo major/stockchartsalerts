@@ -78,25 +78,6 @@ pub fn filter_alerts(alerts: &[Value]) -> Vec<Alert> {
         .collect()
 }
 
-/// Return the Discord emoji prefix for an alert.
-#[must_use]
-pub fn emoji_for_alert(alert: &Alert) -> &'static str {
-    if alert.bearish == "yes" {
-        "🔴"
-    } else {
-        "💚"
-    }
-}
-
-/// Rewrite alert text for Discord when the Python app had special handling.
-#[must_use]
-pub fn format_discord_alert_text(alert_text: &str) -> String {
-    alert_text.strip_prefix("Dow crosses above ").map_or_else(
-        || alert_text.to_string(),
-        |level| format!("THE DOW, THE DOW IS ABOVE {level}"),
-    )
-}
-
 /// Parse a StockCharts timestamp in the America/New_York timezone.
 ///
 /// # Errors
@@ -145,8 +126,7 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        Alert, STOCKCHARTS_TIME_ZONE, emoji_for_alert, filter_alerts, format_discord_alert_text,
-        new_alerts_since, parse_stockcharts_time,
+        Alert, STOCKCHARTS_TIME_ZONE, filter_alerts, new_alerts_since, parse_stockcharts_time,
     };
 
     fn sample_alerts() -> Vec<serde_json::Value> {
@@ -282,32 +262,5 @@ mod tests {
             parse_stockcharts_time("3 Nov 2024, 1:30am").expect("ambiguous timestamp should parse");
 
         assert_eq!(parsed.to_rfc3339(), "2024-11-03T01:30:00-04:00");
-    }
-
-    #[test]
-    fn emoji_matches_bearish_flag() {
-        let bullish = Alert::from_value(
-            json!({"alert": "Test", "lastfired": "31 Jul 2024, 12:33pm", "bearish": "no"}),
-        )
-        .expect("valid alert");
-        let bearish = Alert::from_value(
-            json!({"alert": "Test", "lastfired": "31 Jul 2024, 12:33pm", "bearish": "yes"}),
-        )
-        .expect("valid alert");
-
-        assert_eq!(emoji_for_alert(&bullish), "💚");
-        assert_eq!(emoji_for_alert(&bearish), "🔴");
-    }
-
-    #[test]
-    fn dow_crosses_above_text_is_rewritten() {
-        assert_eq!(
-            format_discord_alert_text("Dow crosses above 41000"),
-            "THE DOW, THE DOW IS ABOVE 41000"
-        );
-        assert_eq!(
-            format_discord_alert_text("Nasdaq crosses below 17200"),
-            "Nasdaq crosses below 17200"
-        );
     }
 }
