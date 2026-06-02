@@ -67,6 +67,53 @@ jobs:
       - name: Run tests
         run: make test
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          toolchain: 1.96.0
+          components: llvm-tools
+          rustflags: ""
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@6ed6112eb9893c58dd600eebccdf6e77ab7bfa9c # v2.79.12
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Enforce 90% line coverage
+        run: cargo llvm-cov --workspace --fail-under-lines 90 --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        if: ${{ !cancelled() && env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
+        with:
+          files: lcov.info
+          fail_ci_if_error: true
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          toolchain: 1.96.0
+          rustflags: ""
+
+      - name: Build docs
+        run: make doc
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -88,6 +135,8 @@ jobs:
       - fmt
       - clippy
       - test
+      - coverage
+      - docs
       - build
     runs-on: ubuntu-latest
     permissions:

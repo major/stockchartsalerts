@@ -65,7 +65,7 @@ The scheduler runs one startup check immediately, then uses `tokio::time::interv
 
 ## Testing
 
-Run `make all` for the full local check or `make test` for tests only.
+Run `make all` for the full local check, `make test` for tests only, `make coverage` for 90% line coverage, or `make patch-coverage` for 100% changed-line coverage.
 
 ### Patterns
 
@@ -82,7 +82,9 @@ make all
 cargo fmt --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
+cargo doc --no-deps --locked
 cargo build --locked
+cargo llvm-cov --workspace --fail-under-lines 90
 ```
 
 Run locally with:
@@ -95,7 +97,7 @@ DISCORD_WEBHOOK_URLS=https://discord.example/webhook cargo run --locked
 
 GitHub Actions:
 
-1. `.github/workflows/main.yml`: Linux Rust quality gates (`fmt`, `clippy`, `test`, `build`) on Rust 1.96.0, followed by the `container` job.
+1. `.github/workflows/main.yml`: Linux Rust quality gates (`fmt`, `clippy`, `test`, `coverage`, `docs`, `build`) on Rust 1.96.0, followed by the `container` job.
 2. `.github/workflows/audit.yml`: RustSec audit on dependency file changes, manual dispatch, and a daily schedule.
 3. `container`: builds `Containerfile`, pushes `ghcr.io/major/stockchartsalerts:latest` only on `main`, then checks out `major/homehosted` and updates `apps/stockchartsalerts/helm/helmrelease.yaml` with the new image digest.
 
@@ -108,7 +110,10 @@ All actions are SHA-pinned. This repository does not publish a crate; avoid rele
 | rustfmt | `rust-toolchain.toml` | `cargo fmt --check` |
 | clippy | `.cargo/config.toml`, `Cargo.toml` | `cargo clippy --all-targets --locked -- -D warnings` |
 | cargo test | `Cargo.toml` | `cargo test --locked` |
+| cargo doc | `Makefile` | `make doc` |
 | cargo build | `Cargo.toml` | `cargo build --locked` |
+| cargo llvm-cov | `Makefile` | `make coverage` |
+| diff-cover | `Makefile` | `make patch-coverage` |
 | pre-commit | `.pre-commit-config.yaml` | auto on commit |
 | renovate | `renovate.json` | dependency updates |
 | codecov | `codecov.yaml` | coverage target |

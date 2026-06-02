@@ -44,6 +44,11 @@ mod tests {
     use crate::Error;
 
     #[test]
+    fn shared_http_client_builds_successfully() {
+        let _client = super::build_http_client().expect("HTTP client should build");
+    }
+
+    #[test]
     fn success_statuses_are_accepted() {
         assert!(super::ensure_success_status("Example", StatusCode::OK).is_ok());
         assert!(super::ensure_success_status("Example", StatusCode::NO_CONTENT).is_ok());
