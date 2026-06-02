@@ -2,6 +2,8 @@
 
 #![deny(missing_docs)]
 
+/// Alert models, filtering, formatting, and timestamp parsing.
+pub mod alerts;
 /// Application configuration.
 pub mod config;
 /// Application error types.
