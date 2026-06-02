@@ -17,9 +17,9 @@ src/
   main.rs         # thin Tokio entry point
   lib.rs          # module tree and top-level run function
   app.rs          # scheduler, polling loop, graceful shutdown, backoff
-  alerts.rs       # alert model, filtering, Eastern Time parsing, Discord text formatting
+  alerts.rs       # alert model, filtering, Eastern Time parsing
   config.rs       # clap/env settings normalization and validation
-  discord.rs      # Discord webhook payloads and posting
+  discord.rs      # Discord webhook formatting, payloads, and posting
   error.rs        # thiserror error enum and Result alias
   http.rs         # shared reqwest client builder
   stockcharts.rs  # StockCharts fetch client, headers, retry behavior, JSON decoding

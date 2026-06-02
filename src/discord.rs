@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::{error, info};
 
-use crate::{Result, alerts::Alert, http::build_http_client};
+use crate::{Result, alerts::Alert};
 
 const AVATAR_URL: &str = "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png";
 
@@ -15,15 +15,6 @@ pub struct DiscordClient {
 }
 
 impl DiscordClient {
-    /// Build a Discord client that uses the shared persistent HTTP client.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the HTTP client cannot be constructed.
-    pub fn new() -> Result<Self> {
-        Ok(Self::with_http_client(build_http_client()?))
-    }
-
     /// Build a Discord client around an existing HTTP client.
     #[must_use]
     pub fn with_http_client(http_client: Client) -> Self {

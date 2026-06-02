@@ -2,25 +2,18 @@
 
 #![deny(missing_docs)]
 
-/// Alert models, filtering, formatting, and timestamp parsing.
-pub mod alerts;
-/// Application orchestration.
-pub mod app;
-/// Application configuration.
-pub mod config;
-/// Discord webhook delivery.
-pub mod discord;
-/// Application error types.
-pub mod error;
-/// Shared HTTP client construction.
-pub mod http;
-/// StockCharts alert fetching.
-pub mod stockcharts;
-/// Logging and Sentry initialization.
-pub mod telemetry;
+mod alerts;
+mod app;
+mod config;
+mod discord;
+mod error;
+mod http;
+mod stockcharts;
+mod telemetry;
 
-pub use config::{Cli, Settings};
 pub use error::{Error, Result};
+
+use config::{Cli, Settings};
 
 /// Run the application until shutdown.
 ///
