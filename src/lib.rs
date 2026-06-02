@@ -6,8 +6,14 @@
 pub mod alerts;
 /// Application configuration.
 pub mod config;
+/// Discord webhook delivery.
+pub mod discord;
 /// Application error types.
 pub mod error;
+/// Shared HTTP client construction.
+pub mod http;
+/// StockCharts alert fetching.
+pub mod stockcharts;
 
 pub use config::{Cli, Settings};
 pub use error::{Error, Result};
