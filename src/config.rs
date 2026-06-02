@@ -101,9 +101,8 @@ impl Settings {
             known_metadata(&self.git_commit),
         ) {
             (Some(branch), Some(commit)) => Some(format!("{branch}@{commit}")),
-            (Some(branch), None) => Some(branch.to_string()),
-            (None, Some(commit)) => Some(commit.to_string()),
-            (None, None) => None,
+            (_, Some(commit)) => Some(commit.to_string()),
+            (_, None) => None,
         }
     }
 
@@ -338,6 +337,9 @@ mod tests {
         assert_eq!(settings.sentry_release().as_deref(), Some("abc123"));
 
         settings.git_commit = "unknown".to_string();
+        assert_eq!(settings.sentry_release(), None);
+
+        settings.git_branch = "main".to_string();
         assert_eq!(settings.sentry_release(), None);
     }
 }
