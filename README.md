@@ -11,7 +11,7 @@ Required:
 Optional:
 
 - `MINUTES_BETWEEN_RUNS`: polling interval in minutes, from 1 to 1440. Defaults to 5.
-- `SENTRY_DSN`: enables Sentry when set.
+- `SENTRY_DSN`: enables Sentry panic, application error, and Discord webhook failure reporting when set.
 - `SENTRY_ENVIRONMENT`: defaults to `production`.
 - `GIT_COMMIT` and `GIT_BRANCH`: injected by the container build and used for the Sentry release string.
 

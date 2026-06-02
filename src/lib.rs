@@ -20,6 +20,6 @@ use config::{Cli, Settings};
 /// # Errors
 ///
 /// Returns an error when configuration is invalid or the runtime cannot initialize.
-pub async fn run() -> Result<()> {
-    app::run(Settings::from_cli(Cli::parse())?).await
+pub fn run() -> Result<()> {
+    app::run(Settings::from_cli(Cli::parse())?)
 }

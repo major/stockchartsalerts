@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::{error, info};
 
-use crate::{Result, alerts::Alert, http::ensure_success_status};
+use crate::{Result, alerts::Alert, http::ensure_success_status, telemetry::capture_error};
 
 const AVATAR_URL: &str = "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png";
 
@@ -32,6 +32,7 @@ impl DiscordClient {
                     info!(webhook = index + 1, total = webhook_urls.len(), symbol = %alert.symbol, "alert sent to Discord")
                 }
                 Err(error) => {
+                    capture_error(&error);
                     error!(webhook = index + 1, total = webhook_urls.len(), symbol = %alert.symbol, %error, "Discord webhook failed")
                 }
             }
@@ -45,7 +46,7 @@ impl DiscordClient {
             .json(payload)
             .send()
             .await
-            .map_err(crate::Error::HttpClient)?;
+            .map_err(|error| crate::Error::HttpClient(error.without_url()))?;
         ensure_success_status("Discord", response.status())
     }
 }
@@ -217,5 +218,20 @@ mod tests {
 
         first.assert_async().await;
         second.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn discord_request_errors_do_not_expose_webhook_urls() {
+        let error = DiscordClient::with_http_client(Client::new())
+            .send_payload(
+                "http://127.0.0.1:9/webhooks/secret-token",
+                &DiscordWebhookPayload::from_alert(&alert("Test alert", "no", "$COMPQ")),
+            )
+            .await
+            .expect_err("closed local port should fail");
+
+        let error = error.to_string();
+        assert!(!error.contains("secret-token"));
+        assert!(!error.contains("127.0.0.1"));
     }
 }

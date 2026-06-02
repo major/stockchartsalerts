@@ -29,6 +29,9 @@ pub enum Error {
     /// StockCharts alert fetching failed.
     #[error("StockCharts error: {0}")]
     StockCharts(String),
+    /// Tokio runtime initialization failed.
+    #[error("failed to initialize Tokio runtime: {0}")]
+    Runtime(std::io::Error),
     /// Shutdown signal handling failed.
     #[error("failed to wait for shutdown signal: {0}")]
     Signal(std::io::Error),

@@ -23,7 +23,7 @@ src/
   error.rs        # thiserror error enum and Result alias
   http.rs         # shared reqwest client builder and HTTP status handling
   stockcharts.rs  # StockCharts fetch client, headers, retry behavior, JSON decoding
-  telemetry.rs    # tracing and optional Sentry initialization
+  telemetry.rs    # tracing, optional Sentry initialization, and error capture
 ```
 
 ## Architecture
@@ -37,6 +37,7 @@ Configuration comes from CLI arguments and environment variables via `clap`.
 - Webhook URLs are split, trimmed, and deduplicated during settings normalization.
 - `MINUTES_BETWEEN_RUNS` is bounded from 1 to 1440 and defaults to 5.
 - Optional Sentry and release env vars: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `GIT_COMMIT`, `GIT_BRANCH`.
+- When `SENTRY_DSN` is configured, scheduler, application, and Discord webhook errors are captured in Sentry in addition to stdout logs. INFO logs still remain stdout-only.
 
 ### HTTP Client
 
