@@ -148,6 +148,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn get_alerts_decodes_gzipped_stockcharts_payloads() {
+        const GZIPPED_ALERTS: &[u8] = &[
+            31, 139, 8, 0, 0, 0, 0, 0, 2, 255, 139, 174, 86, 74, 204, 73, 45, 42, 81, 178, 82, 114,
+            206, 207, 45, 40, 74, 45, 46, 78, 77, 81, 210, 81, 202, 73, 44, 46, 73, 203, 44, 2,
+            178, 173, 148, 140, 13, 21, 188, 74, 115, 20, 140, 12, 140, 76, 116, 20, 12, 141, 172,
+            140, 141, 11, 114, 149, 106, 99, 1, 238, 170, 40, 62, 59, 0, 0, 0,
+        ];
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("GET", "/j-sum/sum")
+            .match_query(Matcher::UrlEncoded("cmd".to_string(), "alert".to_string()))
+            .with_status(200)
+            .with_header("content-encoding", "gzip")
+            .with_header("content-type", "application/json;charset=iso-8859-1")
+            .with_body(GZIPPED_ALERTS)
+            .create_async()
+            .await;
+
+        let alerts = test_client(format!("{}/j-sum/sum?cmd=alert", server.url()))
+            .get_alerts()
+            .await;
+
+        mock.assert_async().await;
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0]["alert"], "Compressed");
+    }
+
+    #[tokio::test]
     async fn get_alerts_retries_then_returns_empty() {
         let mut server = mockito::Server::new_async().await;
         let mock = server
