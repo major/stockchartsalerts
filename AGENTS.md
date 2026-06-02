@@ -92,12 +92,13 @@ DISCORD_WEBHOOK_URLS=https://discord.example/webhook cargo run --locked
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/main.yml`), two jobs:
+GitHub Actions:
 
-1. **testing**: install Rust 1.96.0 with clippy/rustfmt, then run `make all`.
-2. **container**: build and push to GHCR on `main`, then checkout `major/selfhosted` and update the deployment manifest with the new image digest.
+1. `.github/workflows/main.yml`: Linux Rust quality gates (`fmt`, `clippy`, `test`, `build`) on Rust 1.96.0, followed by the `container` job.
+2. `.github/workflows/audit.yml`: RustSec audit on dependency file changes, manual dispatch, and a daily schedule.
+3. `container`: builds `Containerfile`, pushes `ghcr.io/major/stockchartsalerts:latest` only on `main`, then checks out `major/selfhosted` and updates the deployment manifest with the new image digest.
 
-All actions are SHA-pinned. Secrets: `GITHUB_TOKEN`, `SELFHOSTED_PAT`.
+All actions are SHA-pinned. This repository does not publish a crate; avoid release-plz, cargo-dist, crates.io publishing, and GitHub Release binary workflows. Secrets: `GITHUB_TOKEN`, `SELFHOSTED_PAT`.
 
 ## Tooling
 
