@@ -228,6 +228,41 @@ mod tests {
     }
 
     #[test]
+    fn app_new_builds_shared_http_clients() {
+        let app = App::new(settings("https://discord.example/webhook".to_string()))
+            .expect("app should build shared HTTP clients");
+
+        assert_eq!(app.settings.minutes_between_runs, 5);
+    }
+
+    #[tokio::test]
+    async fn run_until_shutdown_performs_initial_check_before_waiting() {
+        let mut server = mockito::Server::new_async().await;
+        let stockcharts = server
+            .mock("GET", "/j-sum/sum")
+            .match_query(Matcher::UrlEncoded("cmd".to_string(), "alert".to_string()))
+            .with_status(200)
+            .with_body("[]")
+            .expect(1)
+            .create_async()
+            .await;
+        let http_client = Client::new();
+        let app = App::with_clients(
+            settings(format!("{}/webhooks/1/abc", server.url())),
+            StockChartsClient::with_http_client(http_client.clone())
+                .with_alerts_url(format!("{}/j-sum/sum?cmd=alert", server.url()))
+                .with_retry_delays(vec![StdDuration::ZERO, StdDuration::ZERO]),
+            DiscordClient::with_http_client(http_client),
+        );
+
+        let result =
+            tokio::time::timeout(StdDuration::from_millis(250), app.run_until_shutdown()).await;
+
+        stockcharts.assert_async().await;
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn scheduler_error_backoff_matches_python_threshold() {
         assert_eq!(scheduler_error_backoff(1), NORMAL_ERROR_BACKOFF);
         assert_eq!(scheduler_error_backoff(4), NORMAL_ERROR_BACKOFF);

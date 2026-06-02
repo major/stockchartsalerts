@@ -25,7 +25,16 @@ This repository uses Rust 1.96 and edition 2024.
 make all
 ```
 
-`make all` runs formatting checks, clippy with warnings denied, tests, and a locked build. Run locally with:
+`make all` runs formatting checks, clippy with warnings denied, tests, documentation checks, and a locked build. Run coverage checks with:
+
+```bash
+make coverage
+make patch-coverage
+```
+
+`make coverage` enforces 90 percent line coverage with `cargo llvm-cov`. `make patch-coverage` checks changed-line coverage against `main` with `diff-cover`; use `DIFF_COVER='uvx diff-cover'` if `diff-cover` is not installed as a standalone command. Public docstring coverage is enforced by the crate-level `#![deny(missing_docs)]` lint, and `make doc` also denies broken rustdoc links.
+
+Run locally with:
 
 ```bash
 DISCORD_WEBHOOK_URLS=https://discord.example/webhook cargo run --locked

@@ -32,3 +32,37 @@ pub fn init_sentry(settings: &Settings) -> Option<ClientInitGuard> {
         },
     )))
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::Settings;
+
+    fn settings(sentry_dsn: &str) -> Settings {
+        Settings {
+            minutes_between_runs: 5,
+            discord_webhook_urls: vec!["https://discord.example/webhook".to_string()],
+            sentry_dsn: sentry_dsn.to_string(),
+            sentry_environment: "test".to_string(),
+            git_commit: "abc123".to_string(),
+            git_branch: "main".to_string(),
+        }
+    }
+
+    #[test]
+    fn tracing_initialization_is_idempotent() {
+        super::init_tracing();
+        super::init_tracing();
+    }
+
+    #[test]
+    fn sentry_initialization_skips_empty_dsn() {
+        assert!(super::init_sentry(&settings("")).is_none());
+    }
+
+    #[test]
+    fn sentry_initialization_returns_guard_when_configured() {
+        let guard = super::init_sentry(&settings("https://public@example.com/1"));
+
+        assert!(guard.is_some());
+    }
+}
