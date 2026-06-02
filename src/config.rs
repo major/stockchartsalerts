@@ -80,10 +80,10 @@ impl Settings {
         Ok(Self {
             minutes_between_runs: cli.minutes_between_runs,
             discord_webhook_urls,
-            sentry_dsn: cli.sentry_dsn,
-            sentry_environment: cli.sentry_environment,
-            git_commit: cli.git_commit,
-            git_branch: cli.git_branch,
+            sentry_dsn: cli.sentry_dsn.trim().to_string(),
+            sentry_environment: normalize_optional_value(&cli.sentry_environment, "production"),
+            git_commit: normalize_optional_value(&cli.git_commit, "unknown"),
+            git_branch: normalize_optional_value(&cli.git_branch, "unknown"),
         })
     }
 
@@ -91,6 +91,19 @@ impl Settings {
     #[must_use]
     pub fn release(&self) -> String {
         format!("{}@{}", self.git_branch, self.git_commit)
+    }
+
+    /// Return useful release metadata for Sentry when build metadata is known.
+    #[must_use]
+    pub fn sentry_release(&self) -> Option<String> {
+        match (
+            known_metadata(&self.git_branch),
+            known_metadata(&self.git_commit),
+        ) {
+            (Some(branch), Some(commit)) => Some(format!("{branch}@{commit}")),
+            (_, Some(commit)) => Some(commit.to_string()),
+            (_, None) => None,
+        }
     }
 
     /// Log non-secret settings with webhook URL values masked.
@@ -132,6 +145,24 @@ fn normalize_webhook_urls(urls: Vec<String>) -> Vec<String> {
         });
 
     normalized
+}
+
+fn normalize_optional_value(value: &str, default: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        default.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn known_metadata(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == "unknown" {
+        None
+    } else {
+        Some(trimmed)
+    }
 }
 
 #[cfg(test)]
@@ -264,5 +295,51 @@ mod tests {
         .expect("settings should be valid");
 
         assert_eq!(settings.release(), "main@abc123");
+    }
+
+    #[test]
+    fn settings_trim_sentry_metadata() {
+        let mut cli = cli_with_urls(vec![WEBHOOK_URL]);
+        cli.sentry_dsn = "  https://public@example.com/1  ".to_string();
+        cli.sentry_environment = " production ".to_string();
+        cli.git_commit = " abc123 ".to_string();
+        cli.git_branch = " main ".to_string();
+
+        let settings = Settings::from_cli(cli).expect("settings should be valid");
+
+        assert_eq!(settings.sentry_dsn, "https://public@example.com/1");
+        assert_eq!(settings.sentry_environment, "production");
+        assert_eq!(settings.release(), "main@abc123");
+    }
+
+    #[test]
+    fn settings_default_empty_sentry_environment_and_metadata() {
+        let mut cli = cli_with_urls(vec![WEBHOOK_URL]);
+        cli.sentry_environment = "   ".to_string();
+        cli.git_commit = "   ".to_string();
+        cli.git_branch = "   ".to_string();
+
+        let settings = Settings::from_cli(cli).expect("settings should be valid");
+
+        assert_eq!(settings.sentry_environment, "production");
+        assert_eq!(settings.release(), "unknown@unknown");
+        assert_eq!(settings.sentry_release(), None);
+    }
+
+    #[test]
+    fn settings_sentry_release_uses_available_metadata() {
+        let mut settings =
+            Settings::from_cli(cli_with_urls(vec![WEBHOOK_URL])).expect("settings should be valid");
+
+        assert_eq!(settings.sentry_release().as_deref(), Some("main@abc123"));
+
+        settings.git_branch = "unknown".to_string();
+        assert_eq!(settings.sentry_release().as_deref(), Some("abc123"));
+
+        settings.git_commit = "unknown".to_string();
+        assert_eq!(settings.sentry_release(), None);
+
+        settings.git_branch = "main".to_string();
+        assert_eq!(settings.sentry_release(), None);
     }
 }

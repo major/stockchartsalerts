@@ -2,9 +2,8 @@
 
 use std::process::ExitCode;
 
-#[tokio::main]
-async fn main() -> ExitCode {
-    match stockchartsalerts::run().await {
+fn main() -> ExitCode {
+    match stockchartsalerts::run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("{error}");

@@ -96,14 +96,14 @@ impl StockChartsClient {
             .header(reqwest::header::USER_AGENT, USER_AGENT)
             .send()
             .await
-            .map_err(Error::HttpClient)?;
+            .map_err(|error| Error::HttpClient(error.without_url()))?;
 
         ensure_success_status("StockCharts", response.status())?;
 
         response
             .json::<Vec<Value>>()
             .await
-            .map_err(Error::HttpClient)
+            .map_err(|error| Error::HttpClient(error.without_url()))
     }
 }
 
@@ -222,5 +222,17 @@ mod tests {
         failure.assert_async().await;
         success.assert_async().await;
         assert_eq!(alerts[0]["alert"], "Recovered");
+    }
+
+    #[tokio::test]
+    async fn fetch_alert_errors_do_not_expose_request_urls() {
+        let error = test_client("http://127.0.0.1:9/j-sum/sum?cmd=alert".to_string())
+            .fetch_alerts()
+            .await
+            .expect_err("closed local port should fail");
+
+        let error = error.to_string();
+        assert!(!error.contains("127.0.0.1"));
+        assert!(!error.contains("cmd=alert"));
     }
 }
