@@ -87,7 +87,7 @@ impl Settings {
         })
     }
 
-    /// Return the Sentry release string used by the Python app.
+    /// Return the Sentry release string as `<branch>@<commit>`.
     #[must_use]
     pub fn release(&self) -> String {
         format!("{}@{}", self.git_branch, self.git_commit)
@@ -136,7 +136,11 @@ fn normalize_webhook_urls(urls: Vec<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
+
     use super::{Cli, Settings};
+
+    const WEBHOOK_URL: &str = "https://discord.com/api/webhooks/123/abc";
 
     fn cli_with_urls(webhook_urls: Vec<&str>) -> Cli {
         Cli {
@@ -147,6 +151,64 @@ mod tests {
             git_commit: "abc123".to_string(),
             git_branch: "main".to_string(),
         }
+    }
+
+    fn parse_cli(args: &[&str]) -> clap::error::Result<Cli> {
+        let mut all_args = vec!["stockchartsalerts"];
+        all_args.extend_from_slice(args);
+
+        Cli::try_parse_from(all_args)
+    }
+
+    #[test]
+    fn cli_minutes_between_runs_defaults_to_five() {
+        let cli = parse_cli(&["--discord-webhook-urls", WEBHOOK_URL])
+            .expect("default interval should parse");
+
+        assert_eq!(cli.minutes_between_runs, 5);
+    }
+
+    #[test]
+    fn cli_minutes_between_runs_accepts_bounds() {
+        let minimum = parse_cli(&[
+            "--minutes-between-runs",
+            "1",
+            "--discord-webhook-urls",
+            WEBHOOK_URL,
+        ])
+        .expect("minimum interval should parse");
+        let maximum = parse_cli(&[
+            "--minutes-between-runs",
+            "1440",
+            "--discord-webhook-urls",
+            WEBHOOK_URL,
+        ])
+        .expect("maximum interval should parse");
+
+        assert_eq!(minimum.minutes_between_runs, 1);
+        assert_eq!(maximum.minutes_between_runs, 1440);
+    }
+
+    #[test]
+    fn cli_minutes_between_runs_rejects_values_outside_bounds() {
+        assert!(
+            parse_cli(&[
+                "--minutes-between-runs",
+                "0",
+                "--discord-webhook-urls",
+                WEBHOOK_URL,
+            ])
+            .is_err()
+        );
+        assert!(
+            parse_cli(&[
+                "--minutes-between-runs",
+                "1441",
+                "--discord-webhook-urls",
+                WEBHOOK_URL,
+            ])
+            .is_err()
+        );
     }
 
     #[test]
@@ -195,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn settings_release_matches_python_format() {
+    fn settings_release_matches_legacy_format() {
         let settings = Settings::from_cli(cli_with_urls(vec![
             "https://discord.com/api/webhooks/123/abc",
         ]))
