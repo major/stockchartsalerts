@@ -7,7 +7,7 @@ use serde_json::Value;
 use tokio::time::sleep;
 use tracing::{error, warn};
 
-use crate::{Error, Result, http::build_http_client};
+use crate::{Error, Result};
 
 const DEFAULT_ALERTS_URL: &str = "https://stockcharts.com/j-sum/sum?cmd=alert";
 const REFERER: &str = "https://stockcharts.com/freecharts/alertsummary.html";
@@ -22,15 +22,6 @@ pub struct StockChartsClient {
 }
 
 impl StockChartsClient {
-    /// Build a StockCharts client that uses the shared persistent HTTP client.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the HTTP client cannot be constructed.
-    pub fn new() -> Result<Self> {
-        Ok(Self::with_http_client(build_http_client()?))
-    }
-
     /// Build a StockCharts client around an existing HTTP client.
     #[must_use]
     pub fn with_http_client(http_client: Client) -> Self {
@@ -42,6 +33,7 @@ impl StockChartsClient {
     }
 
     /// Override the alert URL, primarily for tests.
+    #[cfg(test)]
     #[must_use]
     pub fn with_alerts_url(mut self, alerts_url: impl Into<String>) -> Self {
         self.alerts_url = alerts_url.into();
@@ -49,6 +41,7 @@ impl StockChartsClient {
     }
 
     /// Override retry delays, primarily for tests.
+    #[cfg(test)]
     #[must_use]
     pub fn with_retry_delays(mut self, retry_delays: Vec<Duration>) -> Self {
         self.retry_delays = retry_delays;
