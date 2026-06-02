@@ -108,22 +108,6 @@ mod tests {
 
         assert_eq!(options.release, None);
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::Settings;
-
-    fn settings(sentry_dsn: &str) -> Settings {
-        Settings {
-            minutes_between_runs: 5,
-            discord_webhook_urls: vec!["https://discord.example/webhook".to_string()],
-            sentry_dsn: sentry_dsn.to_string(),
-            sentry_environment: "test".to_string(),
-            git_commit: "abc123".to_string(),
-            git_branch: "main".to_string(),
-        }
-    }
 
     #[test]
     fn tracing_initialization_is_idempotent() {
