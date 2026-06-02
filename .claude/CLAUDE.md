@@ -2,114 +2,86 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🎯 Project Overview
+## Project Overview
 
-**StockCharts Alerts Bot** - A Python bot that polls [StockCharts.com predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) and sends notifications to Discord webhook(s) when new market alerts are detected.
+StockCharts Alerts Bot is a Rust service that polls [StockCharts.com predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) and sends new market alerts to Discord webhooks.
 
-## 🏗️ Architecture
+## Architecture
 
 ### Core Components
 
-- **`bot.py`**: Core alert fetching and delivery logic
-  - `get_alerts()`: Fetches alerts from stockcharts.com with retry logic (3 attempts, exponential backoff)
-  - `get_new_alerts()`: Filters alerts to only those newer than the last run (based on Eastern timezone)
-  - `send_alert_to_discord()`: Sends alerts to all configured Discord webhooks
-  - Uses tenacity for automatic retries on HTTP errors
-
-- **`config.py`**: Pydantic-based configuration management
-  - Environment variable loading from `.env` file
-  - Supports multiple Discord webhooks (comma-separated via `DISCORD_WEBHOOK_URLS`)
-  - Backward compatible with legacy single `DISCORD_WEBHOOK_URL`
-  - Sentry integration for error tracking
-  - Git version info injection at build time
-
-- **`run_bot.py`**: Main entry point and scheduler
-  - Uses `schedule` library to run checks every N minutes (configurable via `MINUTES_BETWEEN_RUNS`)
-  - Includes error resilience: backs off for 5 minutes after 5 consecutive errors
-  - Initializes Sentry with git version info for release tracking
+- `main.rs`: thin Tokio entry point.
+- `lib.rs`: module tree and top-level `run()` function.
+- `app.rs`: scheduler, startup poll, recurring interval, error backoff, and graceful shutdown.
+- `alerts.rs`: alert model, placeholder filtering, Eastern Time timestamp parsing, and Discord text formatting.
+- `config.rs`: clap/env settings normalization. Requires `DISCORD_WEBHOOK_URLS`; singular `DISCORD_WEBHOOK_URL` is unsupported.
+- `discord.rs`: Discord webhook payloads and delivery to all configured webhooks.
+- `http.rs`: shared `reqwest::Client` builder.
+- `stockcharts.rs`: StockCharts fetch client, headers, retry attempts, and JSON decoding.
+- `telemetry.rs`: tracing setup and optional Sentry initialization.
 
 ### Time Zone Handling
 
-⏰ **CRITICAL**: StockCharts uses Eastern Time (America/New_York). All alert timestamps must be parsed with Eastern timezone context to correctly filter new alerts.
+Critical: StockCharts uses Eastern Time (`America/New_York`). Alert timestamps must be parsed with Eastern timezone context to avoid missed or duplicated alerts, including DST transitions.
+
+### HTTP Client Handling
+
+The scheduler path must use one shared `reqwest::Client` clone. Do not create new clients inside polling loops; that was the source of a previous production memory leak in the Python implementation.
 
 ### Error Handling Strategy
 
-🛡️ The bot is designed to be resilient:
-- HTTP requests retry 3x with exponential backoff (2s min, 10s max)
-- On failure, returns empty list rather than crashing
-- Scheduler handles exceptions and backs off on consecutive errors
-- Sentry integration captures all exceptions for monitoring
+- StockCharts fetches make three total attempts.
+- Transient StockCharts failures return an empty list after logging.
+- Discord webhook failures log and continue to the next webhook.
+- The scheduler backs off for 5 minutes after 5 consecutive errors.
+- Sentry initializes only when `SENTRY_DSN` is set.
 
-## 🔧 Development Commands
+## Development Commands
 
-### Environment Setup
 ```bash
-# Install dependencies (uses uv package manager)
-uv sync --locked --all-extras --dev
-```
-
-### Running Tests
-```bash
-# Run all checks (lint, test, typecheck)
 make all
-
-# Individual commands
-uv run pytest              # Tests with coverage
-uv run ruff format --check # Linting
-uv run pyright src/*       # Type checking
+cargo fmt --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+cargo build --locked
 ```
 
-### Running the Bot Locally
+Run locally with:
+
 ```bash
-# Requires environment variables in .env:
-# - DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URLS
-# - Optional: SENTRY_DSN, MINUTES_BETWEEN_RUNS (default: 5)
-uv run python src/stockchartsalerts/run_bot.py
+DISCORD_WEBHOOK_URLS=https://discord.example/webhook cargo run --locked
 ```
 
-### Running Single Tests
-```bash
-# Run specific test file
-uv run pytest tests/test_bot.py
+## Testing
 
-# Run specific test function
-uv run pytest tests/test_bot.py::test_function_name
+- Unit tests live inline in Rust modules.
+- HTTP tests use `mockito`.
+- Time tests use explicit Eastern Time timestamps.
+- Config tests should verify URL splitting, trimming, deduplication, required plural webhooks, and interval bounds.
+- Delivery tests should verify graceful degradation instead of crashes.
 
-# Run with verbose output
-uv run pytest -vv tests/test_bot.py
-```
+## Container Build
 
-## 🧪 Testing
+The Dockerfile is a Rust multi-stage build. The runtime image copies `/usr/local/bin/stockchartsalerts`, runs as a non-root `stockchartsalerts` user, and preserves build args `GIT_COMMIT` and `GIT_BRANCH` for Sentry release metadata.
 
-- **Framework**: pytest with extensive configuration in `pyproject.toml`
-- **Coverage**: Enforced via `pytest-cov` (reports to terminal, HTML, and XML)
-- **Test Utilities**:
-  - `pytest-httpx`: Mock HTTP requests to stockcharts.com
-  - `freezegun`: Time travel for testing time-based logic
-  - `pytest-randomly`: Randomize test order to catch state dependencies
-
-## 📦 Container Build
-
-The project uses a Dockerfile (not Containerfile yet) with:
-- Multi-stage build injecting git version info via build args
-- Pushes to `ghcr.io/major/stockchartsalerts:latest` on main branch
-- Auto-updates deployment manifest in private `major/selfhosted` repo
-
-## 🔑 Environment Variables
+## Environment Variables
 
 Required:
-- `DISCORD_WEBHOOK_URL` OR `DISCORD_WEBHOOK_URLS` (comma-separated for multiple)
+
+- `DISCORD_WEBHOOK_URLS`: comma-separated Discord webhook URLs.
 
 Optional:
-- `MINUTES_BETWEEN_RUNS` (default: 5, range: 1-1440)
-- `SENTRY_DSN` (error tracking)
-- `SENTRY_ENVIRONMENT` (default: "production")
-- `GIT_COMMIT` / `GIT_BRANCH` (set at build time)
 
-## 📝 Code Style
+- `MINUTES_BETWEEN_RUNS`: default `5`, range `1..=1440`.
+- `SENTRY_DSN`: enables Sentry.
+- `SENTRY_ENVIRONMENT`: default `production`.
+- `GIT_COMMIT` and `GIT_BRANCH`: set at build time.
 
-- Type hints required on all functions
-- Uses Ruff for formatting (auto-fix enabled)
-- Pyright for static type checking (strict mode)
-- Loguru for logging with emoji-rich messages 🎨
-- Follow functional patterns: pure functions, single responsibility
+## Code Style
+
+- Rust 1.96, edition 2024.
+- Rustfmt formatting.
+- Clippy with `-D warnings`.
+- `thiserror` for typed errors.
+- `tracing` for logs.
+- Keep parsing/filtering/formatting logic pure and directly testable.

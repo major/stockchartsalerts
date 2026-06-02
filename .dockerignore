@@ -3,23 +3,15 @@
 .gitignore
 .github
 
-# Python
+# Secrets and local config
 .env
 .env.*
-.venv
-venv/
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg-info/
-.pytest_cache/
-.coverage
-.coverage.*
+
+# Rust build output and coverage
+target/
+lcov.info
+coverage.xml
 htmlcov/
-.mypy_cache/
-.pytype/
-.ruff_cache/
 
 # Development
 .vscode/
@@ -28,12 +20,8 @@ htmlcov/
 *.swo
 *~
 
-# Documentation
-docs/
-
 # CI/CD (already in git, no need in image)
 .pre-commit-config.yaml
-.python-version
-
-# Tests
-tests/
+.coderabbit.yaml
+codecov.yaml
+renovate.json

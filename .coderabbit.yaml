@@ -1,2 +1,8 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 inheritance: true
+
+reviews:
+  path_instructions:
+    - path: "src/**/*.rs"
+      instructions: |
+        Preserve StockCharts timestamp parsing in America/New_York. The scheduler path must use one shared reqwest Client clone, not new clients inside polling loops. Transient StockCharts and Discord failures should log and degrade gracefully instead of crashing the service. Do not reintroduce DISCORD_WEBHOOK_URL support; this app expects DISCORD_WEBHOOK_URLS.

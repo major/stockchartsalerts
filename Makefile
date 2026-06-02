@@ -1,12 +1,21 @@
-.PHONY: test lint typecheck all
+.PHONY: all fmt fmt-fix clippy test build audit
+
+all: fmt clippy test build
+
+fmt:
+	cargo fmt --check
+
+fmt-fix:
+	cargo fmt
+
+clippy:
+	cargo clippy --all-targets --locked -- -D warnings
 
 test:
-	uv run pytest
+	cargo test --locked
 
-lint:
-	uv run ruff format --check
+build:
+	cargo build --locked
 
-typecheck:
-	uv run pyright src/*
-
-all: lint test typecheck
+audit:
+	cargo audit

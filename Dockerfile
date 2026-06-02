@@ -1,25 +1,26 @@
-FROM docker.io/library/python:3.14@sha256:250e5c97be05e1eb2272fbdbd810dfd638f9012e1e6f65c99390ad3239943a08
-COPY --from=ghcr.io/astral-sh/uv:0.11.18@sha256:78bc42400d77b0678ba95765305c826652ed5431f399257271dda681d0318f03 /uv /uvx /bin/
+FROM docker.io/library/rust:1.96-slim AS builder
 
 WORKDIR /app
 
-# Copy dependency files first for better layer caching
-# This layer only rebuilds when dependencies change
-COPY pyproject.toml uv.lock README.md ./
-
-# Install dependencies without the project itself - this layer is cached unless dependency files change
-RUN uv sync --locked --no-dev --no-install-project
-
-# Copy source code - this layer rebuilds on any code change
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY src ./src
 
-# Install the project now that source code is available
-RUN uv sync --locked --no-dev
+RUN cargo build --locked --release
 
-# Capture git commit and branch at build time
+FROM docker.io/library/debian:trixie-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /usr/sbin/nologin stockchartsalerts
+
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_BRANCH=${GIT_BRANCH}
 
-CMD [".venv/bin/python", "-m", "stockchartsalerts.run_bot"]
+COPY --from=builder /app/target/release/stockchartsalerts /usr/local/bin/stockchartsalerts
+
+USER stockchartsalerts
+
+CMD ["/usr/local/bin/stockchartsalerts"]
