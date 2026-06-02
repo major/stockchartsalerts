@@ -4,11 +4,7 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::{error, info};
 
-use crate::{
-    Result,
-    alerts::{Alert, emoji_for_alert, format_discord_alert_text},
-    http::build_http_client,
-};
+use crate::{Result, alerts::Alert, http::build_http_client};
 
 const AVATAR_URL: &str = "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png";
 
@@ -99,6 +95,21 @@ impl DiscordWebhookPayload {
     }
 }
 
+fn emoji_for_alert(alert: &Alert) -> &'static str {
+    if alert.bearish == "yes" {
+        "🔴"
+    } else {
+        "💚"
+    }
+}
+
+fn format_discord_alert_text(alert_text: &str) -> String {
+    alert_text.strip_prefix("Dow crosses above ").map_or_else(
+        || alert_text.to_string(),
+        |level| format!("THE DOW, THE DOW IS ABOVE {level}"),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use mockito::Matcher;
@@ -134,6 +145,30 @@ mod tests {
             DiscordWebhookPayload::from_alert(&alert("Dow crosses above 41000", "no", "$INDU"));
 
         assert_eq!(payload.content, "💚  THE DOW, THE DOW IS ABOVE 41000");
+    }
+
+    #[test]
+    fn emoji_matches_bearish_flag() {
+        assert_eq!(
+            super::emoji_for_alert(&alert("Test alert", "no", "$COMPQ")),
+            "💚"
+        );
+        assert_eq!(
+            super::emoji_for_alert(&alert("Test alert", "yes", "$COMPQ")),
+            "🔴"
+        );
+    }
+
+    #[test]
+    fn dow_crosses_above_text_is_rewritten() {
+        assert_eq!(
+            super::format_discord_alert_text("Dow crosses above 41000"),
+            "THE DOW, THE DOW IS ABOVE 41000"
+        );
+        assert_eq!(
+            super::format_discord_alert_text("Nasdaq crosses below 17200"),
+            "Nasdaq crosses below 17200"
+        );
     }
 
     #[tokio::test]
