@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/hi/rust:latest-builder AS builder
+FROM registry.access.redhat.com/hi/rust:latest-builder@sha256:ee2a5e7320b0e1e1efa0bebeda1bb0ba4487671d284429e58b8c9f113cbdd795 AS builder
 
 ENV RUSTUP_INIT_SKIP_PATH_CHECK=yes
 ENV PATH="/usr/local/cargo/bin:${PATH}"
@@ -16,7 +16,7 @@ COPY src ./src
 
 RUN cargo build --locked --release
 
-FROM registry.access.redhat.com/hi/core-runtime:latest
+FROM registry.access.redhat.com/hi/core-runtime:latest@sha256:c85f5e01b7f638cb30e75a8a79d06b0cbeb44209945f62572166448bb56b53e9
 
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
