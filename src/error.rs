@@ -29,6 +29,9 @@ pub enum Error {
     /// StockCharts alert fetching failed.
     #[error("StockCharts error: {0}")]
     StockCharts(String),
+    /// Shutdown signal handling failed.
+    #[error("failed to wait for shutdown signal: {0}")]
+    Signal(std::io::Error),
     /// StockCharts alert timestamp could not be parsed.
     #[error("failed to parse StockCharts timestamp: {0}")]
     TimeParse(String),

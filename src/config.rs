@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 
 use clap::Parser;
+use tracing::info;
 
 use crate::{Error, Result};
 
@@ -13,10 +14,6 @@ pub struct Cli {
     /// Minutes to wait between alert checks.
     #[arg(long, env = "MINUTES_BETWEEN_RUNS", default_value_t = 5, value_parser = clap::value_parser!(u16).range(1..=1440))]
     pub minutes_between_runs: u16,
-
-    /// Discord webhook URL, deprecated in favor of DISCORD_WEBHOOK_URLS.
-    #[arg(long, env = "DISCORD_WEBHOOK_URL")]
-    pub discord_webhook_url: Option<String>,
 
     /// Comma-separated Discord webhook URLs.
     #[arg(long, env = "DISCORD_WEBHOOK_URLS", value_delimiter = ',')]
@@ -71,12 +68,11 @@ impl Settings {
     ///
     /// Returns an error when no Discord webhook URL is configured.
     pub fn from_cli(cli: Cli) -> Result<Self> {
-        let discord_webhook_urls =
-            normalize_webhook_urls(cli.discord_webhook_url, cli.discord_webhook_urls);
+        let discord_webhook_urls = normalize_webhook_urls(cli.discord_webhook_urls);
 
         if discord_webhook_urls.is_empty() {
             return Err(Error::Config(
-                "at least one Discord webhook URL must be provided via DISCORD_WEBHOOK_URL or DISCORD_WEBHOOK_URLS"
+                "at least one Discord webhook URL must be provided via DISCORD_WEBHOOK_URLS"
                     .to_string(),
             ));
         }
@@ -96,15 +92,31 @@ impl Settings {
     pub fn release(&self) -> String {
         format!("{}@{}", self.git_branch, self.git_commit)
     }
+
+    /// Log non-secret settings with webhook URL values masked.
+    pub fn log_safe(&self) {
+        info!(
+            minutes_between_runs = self.minutes_between_runs,
+            "configuration loaded"
+        );
+        info!(
+            discord_webhooks = self.discord_webhook_urls.len(),
+            "Discord webhooks configured"
+        );
+        info!(
+            sentry_enabled = !self.sentry_dsn.is_empty(),
+            "Sentry configuration loaded"
+        );
+        info!(sentry_environment = %self.sentry_environment, "Sentry environment configured");
+        info!(git_commit = %self.git_commit, git_branch = %self.git_branch, "version metadata loaded");
+    }
 }
 
-fn normalize_webhook_urls(legacy_url: Option<String>, urls: Vec<String>) -> Vec<String> {
+fn normalize_webhook_urls(urls: Vec<String>) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut normalized = Vec::new();
 
-    legacy_url
-        .into_iter()
-        .chain(urls)
+    urls.into_iter()
         .flat_map(|value| {
             value
                 .split(',')
@@ -126,10 +138,9 @@ fn normalize_webhook_urls(legacy_url: Option<String>, urls: Vec<String>) -> Vec<
 mod tests {
     use super::{Cli, Settings};
 
-    fn cli_with_urls(legacy_url: Option<&str>, webhook_urls: Vec<&str>) -> Cli {
+    fn cli_with_urls(webhook_urls: Vec<&str>) -> Cli {
         Cli {
             minutes_between_runs: 5,
-            discord_webhook_url: legacy_url.map(str::to_owned),
             discord_webhook_urls: webhook_urls.into_iter().map(str::to_owned).collect(),
             sentry_dsn: String::new(),
             sentry_environment: "production".to_string(),
@@ -139,25 +150,10 @@ mod tests {
     }
 
     #[test]
-    fn settings_accept_legacy_webhook_url() {
-        let settings = Settings::from_cli(cli_with_urls(
-            Some("https://discord.com/api/webhooks/123/abc"),
-            vec![],
-        ))
-        .expect("legacy webhook URL should be accepted");
-
-        assert_eq!(
-            settings.discord_webhook_urls,
-            vec!["https://discord.com/api/webhooks/123/abc"]
-        );
-    }
-
-    #[test]
     fn settings_normalize_multiple_webhook_urls() {
-        let settings = Settings::from_cli(cli_with_urls(
-            None,
-            vec!["https://discord.com/api/webhooks/1/abc , https://discord.com/api/webhooks/2/def"],
-        ))
+        let settings = Settings::from_cli(cli_with_urls(vec![
+            "https://discord.com/api/webhooks/1/abc , https://discord.com/api/webhooks/2/def",
+        ]))
         .expect("webhook URLs should be accepted");
 
         assert_eq!(
@@ -171,13 +167,11 @@ mod tests {
 
     #[test]
     fn settings_deduplicate_webhook_urls() {
-        let settings = Settings::from_cli(cli_with_urls(
-            Some("https://discord.com/api/webhooks/123/abc"),
-            vec![
-                "https://discord.com/api/webhooks/123/abc",
-                "https://discord.com/api/webhooks/456/def",
-            ],
-        ))
+        let settings = Settings::from_cli(cli_with_urls(vec![
+            "https://discord.com/api/webhooks/123/abc",
+            "https://discord.com/api/webhooks/123/abc",
+            "https://discord.com/api/webhooks/456/def",
+        ]))
         .expect("webhook URLs should be accepted");
 
         assert_eq!(
@@ -191,8 +185,7 @@ mod tests {
 
     #[test]
     fn settings_reject_missing_webhook_urls() {
-        let error =
-            Settings::from_cli(cli_with_urls(None, vec![])).expect_err("missing URL should fail");
+        let error = Settings::from_cli(cli_with_urls(vec![])).expect_err("missing URL should fail");
 
         assert!(
             error
@@ -203,10 +196,9 @@ mod tests {
 
     #[test]
     fn settings_release_matches_python_format() {
-        let settings = Settings::from_cli(cli_with_urls(
-            Some("https://discord.com/api/webhooks/123/abc"),
-            vec![],
-        ))
+        let settings = Settings::from_cli(cli_with_urls(vec![
+            "https://discord.com/api/webhooks/123/abc",
+        ]))
         .expect("settings should be valid");
 
         assert_eq!(settings.release(), "main@abc123");
