@@ -1,111 +1,103 @@
 # AGENTS.md
 
-> Authoritative knowledge base for AI agents. Keep this file updated when substantial changes land (new modules, config changes, CI updates, dependency shifts).
+> Authoritative knowledge base for AI agents. Keep this file updated when substantial changes land.
 
 ## Project
 
-StockCharts Alerts Bot: polls stockcharts.com predefined alerts, sends new ones to Discord webhooks. Runs as a scheduled loop in a container.
+StockCharts Alerts Bot: polls stockcharts.com predefined alerts, sends new ones to Discord webhooks, and runs as a scheduled loop in a container.
 
-- Python 3.14, uv package manager, `uv.lock` for reproducibility
-- Entry point: `python -m stockchartsalerts.run_bot`
+- Rust 1.96, edition 2024
+- Entry point: `cargo run` in development, `/usr/local/bin/stockchartsalerts` in the container
 - Container: `ghcr.io/major/stockchartsalerts:latest`
 
 ## Directory Layout
 
 ```text
-src/stockchartsalerts/
-  __init__.py     # loguru config (import-time side effect)
-  bot.py          # fetch alerts, filter new, send to Discord
-  config.py       # pydantic-settings singleton, env/CLI parsing
-  models.py       # Alert pydantic model
-  run_bot.py      # scheduler loop, Sentry init, signal handling
-tests/
-  test_bot.py     # 20 tests - bot logic
-  test_config.py  # 12 tests - config validation
+src/
+  main.rs         # thin Tokio entry point
+  lib.rs          # module tree and top-level run function
+  app.rs          # scheduler, polling loop, graceful shutdown, backoff
+  alerts.rs       # alert model, filtering, Eastern Time parsing, Discord text formatting
+  config.rs       # clap/env settings normalization and validation
+  discord.rs      # Discord webhook payloads and posting
+  error.rs        # thiserror error enum and Result alias
+  http.rs         # shared reqwest client builder
+  stockcharts.rs  # StockCharts fetch client and retry behavior
+  telemetry.rs    # tracing and optional Sentry initialization
 ```
 
 ## Architecture
 
-### Config (`config.py`)
+### Config (`config.rs`)
 
-Pydantic Settings singleton accessed via `get_settings()`. Supports `.env` file and CLI args (`CliSettings`).
+Configuration comes from CLI arguments and environment variables via `clap`.
 
-- `_settings` module-level singleton, reset to `None` between tests
-- `discord_webhook_url` (deprecated) vs `discord_webhook_urls` (comma-separated, preferred)
-- Deduplication of webhook URLs happens at config validation time
-- Env vars: `DISCORD_WEBHOOK_URL`, `DISCORD_WEBHOOK_URLS`, `MINUTES_BETWEEN_RUNS` (1-1440, default 5), `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `GIT_COMMIT`, `GIT_BRANCH`
+- `DISCORD_WEBHOOK_URLS` is required and is the only supported webhook variable.
+- `DISCORD_WEBHOOK_URL` is intentionally unsupported.
+- Webhook URLs are split, trimmed, and deduplicated during settings normalization.
+- `MINUTES_BETWEEN_RUNS` is bounded from 1 to 1440 and defaults to 5.
+- Optional Sentry and release env vars: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `GIT_COMMIT`, `GIT_BRANCH`.
 
-### HTTP Client (`bot.py`)
+### HTTP Client
 
-Persistent `_http_client` (httpx.Client) with connection pool limits (max_connections=10, max_keepalive=5). Created lazily, closed via `cleanup()`.
+`http.rs` builds one shared `reqwest::Client` with a 30 second timeout, 5 max idle connections per host, and 30 second idle pool timeout. `App::new` clones this shared client into both StockCharts and Discord clients; `reqwest::Client` clones share the same connection pool.
 
-**Memory leak history**: prior versions used `httpx.get()` in loops, creating a new client per request, causing OOMKilled in production.
+**Memory leak history**: Python versions created clients in loops and caused OOMKilled in production. Never create new HTTP clients inside the polling loop.
 
 ### Alert Flow
 
-1. `get_alerts()` - fetches JSON from stockcharts.com, retries 3x (tenacity, exponential 2-10s)
-2. `get_new_alerts()` - filters to alerts newer than last run time (Eastern TZ comparison)
-3. `send_alert_to_discord()` - sends formatted embed to all configured webhooks
-4. On failure at any step: log error, return empty list, continue loop
+1. `StockChartsClient::get_alerts()` fetches JSON from stockcharts.com with three total attempts.
+2. `new_alerts_since()` filters placeholders, malformed payloads, and alerts older than the previous run.
+3. `DiscordClient::send_alert_to_webhooks()` posts formatted alerts to all configured webhooks.
+4. Transient failures log and degrade gracefully instead of crashing the service.
 
-### Scheduler (`run_bot.py`)
+### Scheduler (`app.rs`)
 
-`schedule` library runs `get_new_alerts()` + `send_alert_to_discord()` every N minutes. Error backoff: after 5 consecutive errors, waits 5 minutes instead of normal 1 minute between cycles.
+The scheduler runs one startup check immediately, then uses `tokio::time::interval` with `MissedTickBehavior::Delay` for recurring checks. After 5 consecutive errors, it backs off for 5 minutes; otherwise it waits 1 minute before retrying after an error. Ctrl-C triggers graceful shutdown.
 
 ## Critical Constraints
 
-1. **Timezone**: StockCharts uses Eastern Time (America/New_York). ALL timestamp parsing MUST use ET context. Using UTC or naive datetimes will silently miss or duplicate alerts.
-
-2. **HTTP client**: NEVER use `httpx.get()` or create new `httpx.Client()` instances in loops. Always use the persistent `_http_client`. This was a production memory leak.
-
-3. **Webhook config**: `discord_webhook_url` (singular) is deprecated. New code should use `discord_webhook_urls`. At least one URL must be configured or Settings raises `ValueError`.
-
-4. **Cleanup**: `bot.cleanup()` must be called on shutdown to close the HTTP client connection pool.
-
-5. **Error resilience**: Functions must not raise on transient failures. Return empty list/None and log. The scheduler handles retry timing.
+1. **Timezone**: StockCharts uses Eastern Time (`America/New_York`). ALL timestamp parsing MUST use ET context. Using UTC or naive timestamps will silently miss or duplicate alerts.
+2. **HTTP client**: Never build `reqwest::Client` instances in polling loops. Use the shared client from `App::new`.
+3. **Webhook config**: Only `DISCORD_WEBHOOK_URLS` is supported. Do not add singular `DISCORD_WEBHOOK_URL` compatibility.
+4. **Error resilience**: StockCharts and Discord transient failures should log and continue where possible.
 
 ## Testing
 
-Run: `make all` (lint + test + typecheck) or `make test` for tests only.
+Run `make all` for the full local check or `make test` for tests only.
 
 ### Patterns
 
-- **Settings fixture**: autouse `mock_settings` resets `_settings` singleton, sets env vars via `monkeypatch`, constructs `Settings(_env_file=None)` to skip `.env` loading
-- **HTTP mocking**: `pytest-httpx` fixture `httpx_mock` with `add_response(url=..., json=...)` and `add_exception(httpx.TimeoutException(...))`
-- **Time freezing**: `@freezegun.freeze_time("2024-07-31 16:00:00")` decorator on time-dependent tests
-- **Retry bypass**: `mock.patch.object(bot._fetch_alerts.retry, 'wait', wait_none())` to skip tenacity waits in tests
-- **Test data**: module-level `SAMPLE_ALERTS` constant (list of alert dicts)
-- **Naming**: `test_<function>_<scenario>`
-- **Assertions**: verify graceful degradation (empty list on failure, no crashes), call counts on mocks, `pytest.raises` for validation errors
-
-### Dev Dependencies
-
-freezegun, pytest, pytest-cov, pytest-httpx, pytest-randomly, ruff, pyright, pre-commit
+- Unit tests live inline in `#[cfg(test)]` modules.
+- HTTP mocking uses `mockito`.
+- Time-sensitive tests pass explicit Eastern Time timestamps instead of relying on wall-clock time.
+- Assertions verify graceful degradation, webhook deduplication, retry counts, and no crashes on transient failures.
 
 ## CI/CD
 
 GitHub Actions (`.github/workflows/main.yml`), two jobs:
 
-1. **testing**: setup python from `.python-version`, install uv 0.11.7, `uv sync`, `make all`
-2. **container** (depends on testing, main branch only): build+push to GHCR, then checkout `major/selfhosted` repo and update deployment.yaml with new image digest
+1. **testing**: install Rust 1.96.0 with clippy/rustfmt, then run `make all`.
+2. **container**: build and push to GHCR on `main`, then checkout `major/selfhosted` and update the deployment manifest with the new image digest.
 
-All actions pinned to SHA256 digests. Secrets: `GITHUB_TOKEN`, `SELFHOSTED_PAT`.
+All actions are SHA-pinned. Secrets: `GITHUB_TOKEN`, `SELFHOSTED_PAT`.
 
 ## Tooling
 
 | Tool | Config | Command |
 |------|--------|---------|
-| ruff | `pyproject.toml` `[tool.ruff]` | `uv run ruff format --check` |
-| pyright | `pyproject.toml` `[tool.pyright]` | `uv run pyright src/*` |
-| pytest | `pyproject.toml` `[tool.pytest.ini_options]` | `uv run pytest` |
+| rustfmt | `rust-toolchain.toml` | `cargo fmt --check` |
+| clippy | `.cargo/config.toml`, `Cargo.toml` | `cargo clippy --all-targets --locked -- -D warnings` |
+| cargo test | `Cargo.toml` | `cargo test --locked` |
+| cargo build | `Cargo.toml` | `cargo build --locked` |
 | pre-commit | `.pre-commit-config.yaml` | auto on commit |
-| renovate | `renovate.json` | auto-merge minor/patch deps |
-| codecov | `codecov.yaml` | 90% coverage target |
+| renovate | `renovate.json` | dependency updates |
+| codecov | `codecov.yaml` | coverage target |
 
 ## Code Style
 
-- Type hints on all functions, pyright strict mode
-- Ruff formatting with preview features enabled
-- Loguru for logging (emoji-rich messages)
-- Single-purpose functions, functional patterns
-- PEP 257 docstrings
+- `#![deny(missing_docs)]` at crate root.
+- Typed errors with `thiserror` and `crate::error::Result`.
+- Rustfmt formatting and clippy with warnings denied.
+- `tracing` for logs.
+- Small pure helpers for parsing, filtering, and formatting so tests stay fast.
