@@ -126,39 +126,39 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Checkout selfhosted repository
+      - name: Checkout homehosted repository
         if: github.ref == 'refs/heads/main'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
-          repository: major/selfhosted
-          token: ${{ secrets.SELFHOSTED_PAT }}
-          path: selfhosted
+          repository: major/homehosted
+          token: ${{ secrets.HOMEHOSTED_PAT }}
+          path: homehosted
 
       - name: Configure git
         if: github.ref == 'refs/heads/main'
-        working-directory: selfhosted
+        working-directory: homehosted
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Update deployment manifest
         if: github.ref == 'refs/heads/main'
-        working-directory: selfhosted
+        working-directory: homehosted
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          sed -i "s|ghcr.io/major/stockchartsalerts@.*|ghcr.io/major/stockchartsalerts@${DIGEST}|g" apps/base/stockchartsalerts/deployment.yaml
+          sed -i "s|tag: latest@sha256:.*|tag: latest@${DIGEST}|g" apps/stockchartsalerts/helm/helmrelease.yaml
 
       - name: Commit and push changes
         if: github.ref == 'refs/heads/main'
-        working-directory: selfhosted
+        working-directory: homehosted
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           if git diff --quiet; then
             echo "No changes to commit"
           else
-            git add apps/base/stockchartsalerts/deployment.yaml
+            git add apps/stockchartsalerts/helm/helmrelease.yaml
             git commit -m "🤖 Update stockchartsalerts deployment to ${DIGEST}"
             git push
           fi
