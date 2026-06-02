@@ -23,6 +23,8 @@ ARG GIT_BRANCH=unknown
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_BRANCH=${GIT_BRANCH}
 
+COPY --from=builder /usr/lib64/libcrypto.so.3* /usr/lib64/
+COPY --from=builder /usr/lib64/libssl.so.3* /usr/lib64/
 COPY --from=builder /app/target/release/stockchartsalerts /usr/local/bin/stockchartsalerts
 
 ENTRYPOINT ["/usr/local/bin/stockchartsalerts"]
