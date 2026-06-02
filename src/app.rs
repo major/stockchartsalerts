@@ -6,12 +6,12 @@ use tokio::time::{Duration as TokioDuration, MissedTickBehavior, interval, sleep
 use tracing::{error, info, warn};
 
 use crate::{
-    Result, Settings,
+    Error, Result, Settings,
     alerts::{STOCKCHARTS_TIME_ZONE, new_alerts_since},
     discord::DiscordClient,
     http::build_http_client,
     stockcharts::StockChartsClient,
-    telemetry::{init_sentry, init_tracing},
+    telemetry::{capture_error, init_sentry, init_tracing},
 };
 
 const MAX_CONSECUTIVE_ERRORS: u64 = 5;
@@ -84,6 +84,7 @@ impl App {
     pub async fn run_until_shutdown(&self) -> Result<()> {
         info!("running initial alert check");
         if let Err(error) = self.send_alerts_once().await {
+            capture_error(&error);
             error!(%error, "error during initial alert check");
         }
 
@@ -112,6 +113,7 @@ impl App {
                         }
                         Err(error) => {
                             consecutive_errors += 1;
+                            capture_error(&error);
                             error!(%error, consecutive_errors, "error in scheduler loop");
                             let delay = scheduler_error_backoff(consecutive_errors);
                             if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
@@ -131,12 +133,28 @@ impl App {
 /// # Errors
 ///
 /// Returns an error when configuration or runtime initialization fails.
-pub async fn run(settings: Settings) -> Result<()> {
+pub fn run(settings: Settings) -> Result<()> {
     init_tracing();
     settings.log_safe();
     let _sentry_guard = init_sentry(&settings);
     info!(version = %settings.release(), "running StockCharts Alerts Bot");
-    App::new(settings)?.run_until_shutdown().await
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            let error = Error::Runtime(error);
+            capture_error(&error);
+            return Err(error);
+        }
+    };
+
+    let result = runtime.block_on(async { App::new(settings)?.run_until_shutdown().await });
+    if let Err(error) = &result {
+        capture_error(error);
+    }
+    result
 }
 
 fn scheduler_error_backoff(consecutive_errors: u64) -> TokioDuration {
