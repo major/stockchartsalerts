@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::{error, info};
 
-use crate::{Result, alerts::Alert};
+use crate::{Result, alerts::Alert, http::ensure_success_status};
 
 const AVATAR_URL: &str = "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png";
 
@@ -46,16 +46,7 @@ impl DiscordClient {
             .send()
             .await
             .map_err(crate::Error::HttpClient)?;
-        let status = response.status();
-
-        if status.is_success() {
-            Ok(())
-        } else {
-            Err(crate::Error::HttpStatus {
-                service: "Discord",
-                status,
-            })
-        }
+        ensure_success_status("Discord", response.status())
     }
 }
 

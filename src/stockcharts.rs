@@ -7,7 +7,7 @@ use serde_json::Value;
 use tokio::time::sleep;
 use tracing::{error, warn};
 
-use crate::{Error, Result};
+use crate::{Error, Result, http::ensure_success_status};
 
 const DEFAULT_ALERTS_URL: &str = "https://stockcharts.com/j-sum/sum?cmd=alert";
 const REFERER: &str = "https://stockcharts.com/freecharts/alertsummary.html";
@@ -98,13 +98,7 @@ impl StockChartsClient {
             .await
             .map_err(Error::HttpClient)?;
 
-        let status = response.status();
-        if !status.is_success() {
-            return Err(Error::HttpStatus {
-                service: "StockCharts",
-                status,
-            });
-        }
+        ensure_success_status("StockCharts", response.status())?;
 
         response
             .json::<Vec<Value>>()

@@ -21,7 +21,7 @@ src/
   config.rs       # clap/env settings normalization and validation
   discord.rs      # Discord webhook formatting, payloads, and posting
   error.rs        # thiserror error enum and Result alias
-  http.rs         # shared reqwest client builder
+  http.rs         # shared reqwest client builder and HTTP status handling
   stockcharts.rs  # StockCharts fetch client, headers, retry behavior, JSON decoding
   telemetry.rs    # tracing and optional Sentry initialization
 ```
@@ -40,7 +40,7 @@ Configuration comes from CLI arguments and environment variables via `clap`.
 
 ### HTTP Client
 
-`http.rs` builds one shared `reqwest::Client` with a 30 second timeout, 5 max idle connections per host, and 30 second idle pool timeout. `App::new` clones this shared client into both StockCharts and Discord clients; `reqwest::Client` clones share the same connection pool.
+`http.rs` builds one shared `reqwest::Client` with a 30 second timeout, 5 max idle connections per host, and 30 second idle pool timeout. It also centralizes HTTP success/status error mapping. `App::new` clones this shared client into both StockCharts and Discord clients; `reqwest::Client` clones share the same connection pool.
 
 **Memory leak history**: Python versions created clients in loops and caused OOMKilled in production. Never create new HTTP clients inside the polling loop.
 
