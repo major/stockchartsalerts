@@ -50,15 +50,27 @@ impl Alert {
 /// Return alerts that are valid, not placeholder rows, and newer than `previous_run`.
 #[must_use]
 pub fn new_alerts_since(alerts: &[Value], previous_run: DateTime<Tz>) -> Vec<Alert> {
-    filter_alerts(alerts)
+    let parsed_alerts = filter_alerts(alerts)
         .into_iter()
-        .filter(|alert| match parse_stockcharts_time(&alert.lastfired) {
-            Ok(fired_at) => fired_at > previous_run,
+        .filter_map(|alert| match parse_stockcharts_time(&alert.lastfired) {
+            Ok(fired_at) if fired_at > previous_run => Some((alert, fired_at)),
+            Ok(_) => None,
             Err(error) => {
                 warn!(symbol = %alert.symbol, %error, "failed to parse StockCharts alert timestamp");
-                false
+                None
             }
         })
+        .collect::<Vec<_>>();
+
+    parsed_alerts
+        .iter()
+        .filter(|(alert, fired_at)| {
+            parsed_alerts
+                .iter()
+                .filter(|(other, _)| other.symbol == alert.symbol)
+                .all(|(_, other_fired_at)| other_fired_at <= fired_at)
+        })
+        .map(|(alert, _)| alert.clone())
         .collect()
 }
 
@@ -237,6 +249,55 @@ mod tests {
                 .map(|alert| alert.symbol.as_str())
                 .collect::<Vec<_>>(),
             vec!["$BPSPX", "$BPINFO", "$INDU"]
+        );
+    }
+
+    #[test]
+    fn new_alerts_since_keeps_latest_alerts_per_symbol() {
+        let previous_run = STOCKCHARTS_TIME_ZONE
+            .with_ymd_and_hms(2026, 6, 8, 9, 29, 0)
+            .single()
+            .expect("valid timestamp");
+        let alerts = vec![
+            json!({
+                "symbol": "$COMPQ",
+                "bearish": "yes",
+                "alert": "Nasdaq crosses below 25800",
+                "lastfired": "8 Jun 2026, 9:30am"
+            }),
+            json!({
+                "symbol": "$COMPQ",
+                "bearish": "no",
+                "alert": "Nasdaq crosses above 25800",
+                "lastfired": "8 Jun 2026, 9:33am"
+            }),
+            json!({
+                "symbol": "$COMPQ",
+                "bearish": "no",
+                "alert": "Nasdaq crosses above 25900",
+                "lastfired": "8 Jun 2026, 9:33am"
+            }),
+            json!({
+                "symbol": "$GOLD",
+                "bearish": "yes",
+                "alert": "Gold crosses below 4400",
+                "lastfired": "8 Jun 2026, 9:30am"
+            }),
+        ];
+
+        let alerts = new_alerts_since(&alerts, previous_run);
+
+        assert_eq!(alerts.len(), 3);
+        assert_eq!(
+            alerts
+                .iter()
+                .map(|alert| alert.alert.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Nasdaq crosses above 25800",
+                "Nasdaq crosses above 25900",
+                "Gold crosses below 4400"
+            ]
         );
     }
 
