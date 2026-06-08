@@ -22,6 +22,7 @@ impl DiscordClient {
     }
 
     /// Send an alert to all configured Discord webhooks, logging and continuing on failures.
+    #[allow(dead_code)]
     pub async fn send_alert_to_webhooks(&self, alert: &Alert, webhook_urls: &[String]) {
         info!(alert = %alert.alert, lastfired = %alert.lastfired, "sending alert to Discord");
 
@@ -34,6 +35,43 @@ impl DiscordClient {
                 Err(error) => {
                     capture_error(&error);
                     error!(webhook = index + 1, total = webhook_urls.len(), symbol = %alert.symbol, %error, "Discord webhook failed")
+                }
+            }
+        }
+    }
+
+    /// Send a batch of alerts grouped by symbol to all configured Discord webhooks.
+    pub async fn send_alerts_to_webhooks(&self, alerts: &[Alert], webhook_urls: &[String]) {
+        use std::collections::HashMap;
+
+        let mut groups: HashMap<&str, Vec<&Alert>> = HashMap::new();
+        for alert in alerts {
+            groups.entry(&alert.symbol).or_default().push(alert);
+        }
+
+        for (symbol, symbol_alerts) in &groups {
+            info!(
+                symbol,
+                count = symbol_alerts.len(),
+                "sending grouped alerts to Discord"
+            );
+
+            let payload = DiscordWebhookPayload::from_alerts(symbol_alerts);
+            for (index, webhook_url) in webhook_urls.iter().enumerate() {
+                match self.send_payload(webhook_url, &payload).await {
+                    Ok(()) => {
+                        info!(
+                            webhook = index + 1,
+                            total = webhook_urls.len(),
+                            symbol,
+                            count = symbol_alerts.len(),
+                            "alert group sent to Discord"
+                        )
+                    }
+                    Err(error) => {
+                        capture_error(&error);
+                        error!(webhook = index + 1, total = webhook_urls.len(), symbol, count = symbol_alerts.len(), %error, "Discord webhook failed")
+                    }
                 }
             }
         }
@@ -63,8 +101,9 @@ pub struct DiscordWebhookPayload {
 }
 
 impl DiscordWebhookPayload {
-    /// Build the Discord payload for an alert.
+    /// Build the Discord payload for a single alert.
     #[must_use]
+    #[allow(dead_code)]
     pub fn from_alert(alert: &Alert) -> Self {
         Self {
             username: alert.symbol.clone(),
@@ -74,6 +113,31 @@ impl DiscordWebhookPayload {
                 emoji_for_alert(alert),
                 format_discord_alert_text(&alert.alert)
             ),
+        }
+    }
+
+    /// Build the Discord payload for a group of alerts sharing the same symbol.
+    #[must_use]
+    pub fn from_alerts(alerts: &[&Alert]) -> Self {
+        let symbol = alerts
+            .first()
+            .map_or("UNKNOWN", |alert| alert.symbol.as_str());
+        let content = alerts
+            .iter()
+            .map(|alert| {
+                format!(
+                    "{}  {}",
+                    emoji_for_alert(alert),
+                    format_discord_alert_text(&alert.alert)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        Self {
+            username: symbol.to_string(),
+            avatar_url: AVATAR_URL,
+            content,
         }
     }
 }
@@ -120,6 +184,17 @@ mod tests {
         assert_eq!(payload.username, "$COMPQ");
         assert_eq!(payload.avatar_url, super::AVATAR_URL);
         assert_eq!(payload.content, "💚  Test alert");
+    }
+
+    #[test]
+    fn grouped_payload_formats_multiple_alerts() {
+        let first = alert("First alert", "no", "$COMPQ");
+        let second = alert("Second alert", "yes", "$COMPQ");
+        let alerts = vec![&first, &second];
+        let payload = DiscordWebhookPayload::from_alerts(&alerts);
+
+        assert_eq!(payload.username, "$COMPQ");
+        assert_eq!(payload.content, "💚  First alert\n🔴  Second alert");
     }
 
     #[test]
@@ -233,5 +308,45 @@ mod tests {
         let error = error.to_string();
         assert!(!error.contains("secret-token"));
         assert!(!error.contains("127.0.0.1"));
+    }
+
+    #[tokio::test]
+    async fn send_alerts_to_webhooks_groups_by_symbol() {
+        let mut server = mockito::Server::new_async().await;
+        let first = server
+            .mock("POST", "/webhooks/1/abc")
+            .match_body(Matcher::Json(json!({
+                "username": "$COMPQ",
+                "avatar_url": super::AVATAR_URL,
+                "content": "💚  First alert\n🔴  Second alert"
+            })))
+            .with_status(204)
+            .expect(1)
+            .create_async()
+            .await;
+        let second = server
+            .mock("POST", "/webhooks/1/abc")
+            .match_body(Matcher::Json(json!({
+                "username": "$SPX",
+                "avatar_url": super::AVATAR_URL,
+                "content": "💚  SPX alert"
+            })))
+            .with_status(204)
+            .expect(1)
+            .create_async()
+            .await;
+
+        let webhook_urls = vec![format!("{}/webhooks/1/abc", server.url())];
+        let alerts = vec![
+            alert("First alert", "no", "$COMPQ"),
+            alert("Second alert", "yes", "$COMPQ"),
+            alert("SPX alert", "no", "$SPX"),
+        ];
+        DiscordClient::with_http_client(Client::new())
+            .send_alerts_to_webhooks(&alerts, &webhook_urls)
+            .await;
+
+        first.assert_async().await;
+        second.assert_async().await;
     }
 }

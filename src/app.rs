@@ -66,14 +66,15 @@ impl App {
         let alerts = self.stockcharts_client.get_alerts().await;
         let previous_run = now - Duration::minutes(i64::from(self.settings.minutes_between_runs));
         let new_alerts = new_alerts_since(&alerts, previous_run);
+        let count = new_alerts.len();
 
-        for alert in &new_alerts {
+        if count > 0 {
             self.discord_client
-                .send_alert_to_webhooks(alert, &self.settings.discord_webhook_urls)
+                .send_alerts_to_webhooks(&new_alerts, &self.settings.discord_webhook_urls)
                 .await;
         }
 
-        Ok(new_alerts.len())
+        Ok(count)
     }
 
     /// Run the initial check and interval scheduler until Ctrl-C is received.

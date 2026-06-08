@@ -28,6 +28,16 @@ pub struct Alert {
     /// Timestamp string from StockCharts.
     #[serde(deserialize_with = "deserialize_trimmed_string")]
     pub lastfired: String,
+    /// Whether this is a newly active alert. StockCharts uses the string "yes" for active
+    /// alerts. Alerts that were previously triggered but are no longer active are marked "no".
+    #[serde(
+        default = "default_newalert",
+        deserialize_with = "deserialize_trimmed_string"
+    )]
+    pub newalert: String,
+    /// StockCharts record ID for the alert definition.
+    #[serde(default, deserialize_with = "deserialize_trimmed_string")]
+    pub recid: String,
     /// Stock or index symbol. Missing values match the Python default.
     #[serde(
         default = "default_symbol",
@@ -47,11 +57,13 @@ impl Alert {
     }
 }
 
-/// Return alerts that are valid, not placeholder rows, and newer than `previous_run`.
+/// Return alerts that are valid, not placeholder rows, newly active, and newer than
+/// `previous_run`.
 #[must_use]
 pub fn new_alerts_since(alerts: &[Value], previous_run: DateTime<Tz>) -> Vec<Alert> {
     filter_alerts(alerts)
         .into_iter()
+        .filter(|alert| alert.newalert == "yes")
         .filter(|alert| match parse_stockcharts_time(&alert.lastfired) {
             Ok(fired_at) => fired_at > previous_run,
             Err(error) => {
@@ -107,6 +119,10 @@ fn parse_naive_stockcharts_time(value: &str) -> Result<NaiveDateTime> {
 
 fn default_bearish() -> String {
     "no".to_string()
+}
+
+fn default_newalert() -> String {
+    "yes".to_string()
 }
 
 fn default_symbol() -> String {
@@ -177,7 +193,7 @@ mod tests {
                 "notes": "",
                 "alert": "Nasdaq crosses below 17200",
                 "lastfired": "31 Jul 2024, 11:47am",
-                "newalert": "yes",
+                "newalert": "no",
                 "type": "a",
                 "recid": "450121"
             }),
@@ -188,7 +204,7 @@ mod tests {
                 "notes": "",
                 "alert": "Nasdaq crosses below 17300",
                 "lastfired": "31 Jul 2024, 11:47am",
-                "newalert": "yes",
+                "newalert": "no",
                 "type": "a",
                 "recid": "450208"
             }),
@@ -207,6 +223,8 @@ mod tests {
         assert_eq!(alert.alert, "Test alert");
         assert_eq!(alert.lastfired, "31 Jul 2024, 12:33pm");
         assert_eq!(alert.bearish, "no");
+        assert_eq!(alert.newalert, "yes");
+        assert_eq!(alert.recid, "");
         assert_eq!(alert.symbol, "UNKNOWN");
     }
 
@@ -238,6 +256,19 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["$BPSPX", "$BPINFO", "$INDU"]
         );
+    }
+
+    #[test]
+    fn new_alerts_since_filters_by_newalert_field() {
+        let previous_run = STOCKCHARTS_TIME_ZONE
+            .with_ymd_and_hms(2024, 7, 31, 11, 0, 0)
+            .single()
+            .expect("valid timestamp");
+
+        let alerts = new_alerts_since(&sample_alerts(), previous_run);
+
+        assert_eq!(alerts.len(), 3);
+        assert!(alerts.iter().all(|alert| alert.newalert == "yes"));
     }
 
     #[test]
