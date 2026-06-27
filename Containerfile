@@ -16,7 +16,7 @@ COPY src ./src
 
 RUN cargo build --locked --release
 
-FROM registry.access.redhat.com/hi/core-runtime:latest@sha256:47c4393878ee5848f91d9538dbe742b8cd04da6d1db80286c293460eeb5b1a6c
+FROM registry.access.redhat.com/hi/core-runtime:latest@sha256:3fadedf666f137f7d36a673fcf215307bf19bc56c12eb6a323674606eac3c5bf
 
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
