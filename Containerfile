@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/hi/rust:latest-builder@sha256:8eb8f116e61af323bbceaf9ee6076c4bab148791b349adfe254f46eb68ae67a9 AS builder
+FROM registry.access.redhat.com/hi/rust:latest-builder@sha256:ef54124d698b67c7fc6cde0e269378897156faab32071ea3761e6ca1e8925b26 AS builder
 
 ENV RUSTUP_INIT_SKIP_PATH_CHECK=yes
 ENV PATH="/usr/local/cargo/bin:${PATH}"
