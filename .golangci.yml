@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+  enable:
+    - revive
+    - errcheck
+    - ineffassign
+    - unused
+    - staticcheck
+    - govet
+  settings:
+    revive:
+      rules:
+        - name: exported
+          severity: error
+        - name: blank-imports
+        - name: unused-parameter
+
+formatters:
+  enable:
+    - gofumpt
