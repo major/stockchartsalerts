@@ -21,6 +21,10 @@ type App struct {
 	// tickerInterval is the interval for the polling ticker. Defaults to MinutesBetweenRuns.
 	// This is exposed for testing purposes.
 	tickerInterval time.Duration
+	// lastSuccessfulRun tracks the timestamp of the last successful poll.
+	// Used to anchor the previousRun window for the next check, ensuring alerts
+	// fired during extended outages (beyond MinutesBetweenRuns) are not dropped.
+	lastSuccessfulRun time.Time
 }
 
 // New creates a new App with a shared HTTP client built from production defaults.
@@ -53,22 +57,31 @@ func (a *App) WithTickerInterval(interval time.Duration) *App {
 }
 
 // SendAlertsOnce fetches alerts and sends them to Discord webhooks.
-// It uses the current time (in America/New_York) to compute the previous run window.
+// It uses the current time (in America/New_York) to compute the previous run window,
+// anchored to the last successful poll time to avoid dropping alerts during extended outages.
 // Returns the number of alerts sent.
 func (a *App) SendAlertsOnce(ctx context.Context) (int, error) {
-	return a.SendAlertsOnceAt(ctx, time.Now())
+	return a.SendAlertsOnceAt(ctx, time.Now(), a.lastSuccessfulRun)
 }
 
-// SendAlertsOnceAt fetches alerts and sends them to Discord webhooks using an explicit "now" time.
-// This is primarily for testing. It computes previousRun = now - MinutesBetweenRuns,
-// filters alerts newer than previousRun, and sends each to all configured Discord webhooks.
+// SendAlertsOnceAt fetches alerts and sends them to Discord webhooks using an explicit "now" time
+// and previous run anchor. If previousRunAnchor is zero, it defaults to now - MinutesBetweenRuns.
+// This is primarily for testing. It filters alerts newer than the computed previousRun window
+// and sends each to all configured Discord webhooks.
 // Returns the number of alerts sent.
-func (a *App) SendAlertsOnceAt(ctx context.Context, now time.Time) (int, error) {
+func (a *App) SendAlertsOnceAt(ctx context.Context, now time.Time, previousRunAnchor time.Time) (int, error) {
 	// Convert now to America/New_York timezone for consistency with StockCharts timestamps
 	now = now.In(alerts.StockChartsTimeZone())
 
-	// Compute the previous run window
-	previousRun := now.Add(-time.Duration(a.settings.MinutesBetweenRuns) * time.Minute)
+	// Compute the previous run window, anchored to the last successful run
+	var previousRun time.Time
+	if previousRunAnchor.IsZero() {
+		// First run or no prior successful run: use now - MinutesBetweenRuns
+		previousRun = now.Add(-time.Duration(a.settings.MinutesBetweenRuns) * time.Minute)
+	} else {
+		// Use the last successful run as the anchor
+		previousRun = previousRunAnchor.In(alerts.StockChartsTimeZone())
+	}
 
 	// Fetch alerts from StockCharts
 	rawAlerts, err := a.stockchartsClient.GetAlerts(ctx)
@@ -86,6 +99,9 @@ func (a *App) SendAlertsOnceAt(ctx context.Context, now time.Time) (int, error) 
 		count++
 	}
 
+	// Update the last successful run time to anchor the next check
+	a.lastSuccessfulRun = now
+
 	return count, nil
 }
 
@@ -100,8 +116,9 @@ func errorBackoffDuration(consecutiveErrors int) time.Duration {
 
 // RunUntilShutdown runs the alert polling loop until the context is cancelled.
 // It performs one check immediately, then uses a ticker to run checks at regular intervals.
-// On success, the consecutive error counter resets. On error, the counter increments,
-// and the loop sleeps before the next check: 60 seconds normally, 300 seconds after 5 consecutive errors.
+// On success, the consecutive error counter resets and the ticker is reset to the normal interval.
+// On error, the counter increments and the ticker is reset to a backoff duration:
+// 60 seconds normally, 300 seconds after 5 consecutive errors.
 // The loop exits cleanly when ctx is cancelled (checked with priority via select).
 //
 // Note on missed-tick behavior: Go's stdlib time.Ticker naturally drops missed
@@ -132,28 +149,21 @@ func (a *App) RunUntilShutdown(ctx context.Context) error {
 			return ctx.Err()
 		case <-ticker.C:
 			// Perform the alert check
-			count, err := a.SendAlertsOnce(ctx)
+			// Use the last successful run as the anchor for the next check
+			count, err := a.SendAlertsOnceAt(ctx, time.Now(), a.lastSuccessfulRun)
 			if err != nil {
 				consecutiveErrors++
 				slog.Error("alert check failed",
 					"error", err,
 					"consecutive_errors", consecutiveErrors)
 
-				// Determine backoff duration
+				// Determine backoff duration and reset ticker
 				backoffDuration := errorBackoffDuration(consecutiveErrors)
-
-				// Sleep before the next check
-				select {
-				case <-time.After(backoffDuration):
-					// Continue to the next iteration
-				case <-ctx.Done():
-					// Context cancelled during backoff; exit cleanly
-					slog.Info("shutdown signal received during backoff, exiting")
-					return ctx.Err()
-				}
+				ticker.Reset(backoffDuration)
 			} else {
-				// Success: reset the error counter and log
+				// Success: reset the error counter and ticker to normal interval
 				consecutiveErrors = 0
+				ticker.Reset(a.tickerInterval)
 				slog.Info("alert check completed", "alerts_sent", count)
 			}
 		}

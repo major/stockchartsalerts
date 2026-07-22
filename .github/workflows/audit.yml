@@ -7,10 +7,12 @@ on:
     paths:
       - "**/go.mod"
       - "**/go.sum"
+      - "**/*.go"
   pull_request:
     paths:
       - "**/go.mod"
       - "**/go.sum"
+      - "**/*.go"
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
@@ -29,7 +31,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@41dfa10bad2ba3a3c63e49ff6b516faad5fc6f2d # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.5"
 
       - name: Run govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

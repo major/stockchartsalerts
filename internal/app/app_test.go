@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/major/stockchartsalerts/internal/alerts"
 	"github.com/major/stockchartsalerts/internal/config"
 	"github.com/major/stockchartsalerts/internal/discord"
 	"github.com/major/stockchartsalerts/internal/stockcharts"
@@ -27,7 +28,7 @@ func TestSendAlertsOnceAtEndToEnd(t *testing.T) {
 
 		// Return a sample alert response
 		alerts := []json.RawMessage{
-			json.RawMessage(`{"alert":"Test Alert","bearish":"no","lastfired":"1 Jan 2024, 10:00am","symbol":"TEST"}`),
+			json.RawMessage(`{"alert":"Test Alert","bearish":"no","lastfired":"1 Jan 2024, 10:02am","symbol":"TEST"}`),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(alerts)
@@ -56,9 +57,10 @@ func TestSendAlertsOnceAtEndToEnd(t *testing.T) {
 	}
 	app := NewWithClients(settings, scClient, dcClient)
 
-	// Run the check at a specific time
-	now := time.Date(2024, 1, 1, 10, 5, 0, 0, time.UTC)
-	count, err := app.SendAlertsOnceAt(context.Background(), now)
+	// Run the check at a specific time (10:05 AM ET)
+	// Alert was at 10:02 AM ET, which is within the 5-minute window (10:00-10:05)
+	now := time.Date(2024, 1, 1, 10, 5, 0, 0, alerts.StockChartsTimeZone())
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 	if err != nil {
 		t.Fatalf("SendAlertsOnceAt failed: %v", err)
 	}
@@ -113,7 +115,7 @@ func TestSendAlertsOnceAtFiltersOldAlerts(t *testing.T) {
 
 	// Run the check at 10:05 AM ET (alert was at 9:50 AM ET, outside the 5-minute window)
 	now := time.Date(2024, 1, 1, 10, 5, 0, 0, loc)
-	count, err := app.SendAlertsOnceAt(context.Background(), now)
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 	if err != nil {
 		t.Fatalf("SendAlertsOnceAt failed: %v", err)
 	}
@@ -132,7 +134,7 @@ func TestSendAlertsOnceAtMultipleWebhooks(t *testing.T) {
 	// Set up a fake StockCharts server
 	stockchartsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		alerts := []json.RawMessage{
-			json.RawMessage(`{"alert":"Multi Alert","bearish":"yes","lastfired":"1 Jan 2024, 10:00am","symbol":"MULTI"}`),
+			json.RawMessage(`{"alert":"Multi Alert","bearish":"yes","lastfired":"1 Jan 2024, 10:03am","symbol":"MULTI"}`),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(alerts)
@@ -165,9 +167,10 @@ func TestSendAlertsOnceAtMultipleWebhooks(t *testing.T) {
 	}
 	app := NewWithClients(settings, scClient, dcClient)
 
-	// Run the check
-	now := time.Date(2024, 1, 1, 10, 5, 0, 0, time.UTC)
-	count, err := app.SendAlertsOnceAt(context.Background(), now)
+	// Run the check at a specific time (10:05 AM ET)
+	// Alert was at 10:03 AM ET, which is within the 5-minute window (10:00-10:05)
+	now := time.Date(2024, 1, 1, 10, 5, 0, 0, alerts.StockChartsTimeZone())
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 	if err != nil {
 		t.Fatalf("SendAlertsOnceAt failed: %v", err)
 	}
@@ -340,16 +343,21 @@ func TestSendAlertsOnceUsesCurrentTime(t *testing.T) {
 	}
 	app := NewWithClients(settings, scClient, dcClient)
 
-	// Call SendAlertsOnce (which uses time.Now() internally)
-	// We can't directly test the exact time used, but we can verify it works
-	count, err := app.SendAlertsOnce(context.Background())
+	// Use a fixed time for testing (10:05 AM ET on 1 Jan 2024)
+	// The alert fired at 10:04 AM, which is within the 5-minute window (10:00-10:05)
+	now := time.Date(2024, 1, 1, 10, 5, 0, 0, alerts.StockChartsTimeZone())
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 	if err != nil {
-		t.Fatalf("SendAlertsOnce failed: %v", err)
+		t.Fatalf("SendAlertsOnceAt failed: %v", err)
 	}
 
 	// The alert should be sent (it's recent enough)
-	if count < 0 {
-		t.Errorf("expected non-negative count, got %d", count)
+	if count != 1 {
+		t.Errorf("expected 1 alert sent, got %d", count)
+	}
+
+	if discordCalls != 1 {
+		t.Errorf("expected 1 Discord call, got %d", discordCalls)
 	}
 }
 
@@ -543,7 +551,7 @@ func TestSendAlertsOnceAtWithNoAlerts(t *testing.T) {
 
 	// Pass a time in ET
 	now := time.Date(2026, 7, 21, 16, 25, 0, 0, loc) // 4:25 PM ET
-	count, err := app.SendAlertsOnceAt(context.Background(), now)
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 	if err != nil {
 		t.Fatalf("SendAlertsOnceAt failed: %v", err)
 	}
@@ -716,7 +724,7 @@ func TestSendAlertsOnceAtErrorHandling(t *testing.T) {
 
 	// Pass a time in ET
 	now := time.Date(2026, 7, 21, 16, 25, 0, 0, loc)
-	count, err := app.SendAlertsOnceAt(context.Background(), now)
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 
 	// Should return 0 alerts on error
 	if count != 0 {
@@ -884,12 +892,12 @@ func TestSendAlertsOnceAtInvalidTimezone(t *testing.T) {
 
 	// Pass a time in ET
 	now := time.Date(2026, 7, 21, 16, 25, 0, 0, loc)
-	count, _ := app.SendAlertsOnceAt(context.Background(), now)
+	count, _ := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 
 	// Should not error (StockCharts client will fail, but that's expected)
 	// The timezone loading should succeed
-	if count < 0 {
-		t.Errorf("expected non-negative count, got %d", count)
+	if count != 0 {
+		t.Errorf("expected 0 alerts on error, got %d", count)
 	}
 }
 
@@ -1209,5 +1217,114 @@ func TestRunUntilShutdownExtendedBackoffAfterFiveErrors(t *testing.T) {
 	// Should have taken at least 3 seconds (the timeout)
 	if elapsed < 3*time.Second {
 		t.Errorf("RunUntilShutdown exited too quickly: %v (expected >= 3s)", elapsed)
+	}
+}
+
+// TestSendAlertsOnceAtWithExtendedOutageAnchor tests that alerts fired during an extended outage
+// (longer than MinutesBetweenRuns) are picked up when using a previousRunAnchor from a prior successful run.
+func TestSendAlertsOnceAtWithExtendedOutageAnchor(t *testing.T) {
+	// Set up a fake StockCharts server that returns alerts
+	stockchartsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Return an alert that fired 10 minutes ago
+		alerts := []json.RawMessage{
+			json.RawMessage(`{"alert":"Alert during outage","bearish":"no","lastfired":"1 Jan 2024, 9:50am","symbol":"TEST"}`),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(alerts)
+	}))
+	defer stockchartsServer.Close()
+
+	// Set up a fake Discord server
+	discordCalls := 0
+	discordServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		discordCalls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer discordServer.Close()
+
+	// Create clients
+	httpClient := &http.Client{}
+	scClient := stockcharts.NewClient(httpClient).WithAlertsURL(stockchartsServer.URL)
+	dcClient := discord.NewClient(httpClient)
+
+	// Create app with 5-minute interval
+	settings := config.Settings{
+		MinutesBetweenRuns: 5,
+		DiscordWebhookURLs: []string{discordServer.URL},
+	}
+	app := NewWithClients(settings, scClient, dcClient)
+
+	// Simulate a prior successful run at 9:45 AM ET
+	// Then simulate a check at 10:05 AM ET (20 minutes later, well beyond the 5-minute interval)
+	// The alert fired at 9:50 AM ET, which is between the prior run (9:45) and now (10:05)
+	// Without the anchor, it would be filtered out (outside the 5-minute window from 10:00-10:05)
+	// With the anchor, it should be included (within the window from 9:45-10:05)
+
+	priorRun := time.Date(2024, 1, 1, 9, 45, 0, 0, alerts.StockChartsTimeZone())
+	now := time.Date(2024, 1, 1, 10, 5, 0, 0, alerts.StockChartsTimeZone())
+
+	count, err := app.SendAlertsOnceAt(context.Background(), now, priorRun)
+	if err != nil {
+		t.Fatalf("SendAlertsOnceAt failed: %v", err)
+	}
+
+	// The alert should be sent because it's within the window from priorRun to now
+	if count != 1 {
+		t.Errorf("expected 1 alert sent (within extended outage window), got %d", count)
+	}
+
+	if discordCalls != 1 {
+		t.Errorf("expected 1 Discord call, got %d", discordCalls)
+	}
+}
+
+// TestSendAlertsOnceAtWithZeroAnchorUsesDefault tests that a zero previousRunAnchor
+// defaults to now - MinutesBetweenRuns.
+func TestSendAlertsOnceAtWithZeroAnchorUsesDefault(t *testing.T) {
+	// Set up a fake StockCharts server that returns an old alert
+	stockchartsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Alert fired 10 minutes ago (before the 5-minute window)
+		alerts := []json.RawMessage{
+			json.RawMessage(`{"alert":"Old Alert","bearish":"no","lastfired":"1 Jan 2024, 9:50am","symbol":"OLD"}`),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(alerts)
+	}))
+	defer stockchartsServer.Close()
+
+	// Set up a fake Discord server
+	discordCalls := 0
+	discordServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		discordCalls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer discordServer.Close()
+
+	// Create clients
+	httpClient := &http.Client{}
+	scClient := stockcharts.NewClient(httpClient).WithAlertsURL(stockchartsServer.URL)
+	dcClient := discord.NewClient(httpClient)
+
+	// Create app with 5-minute interval
+	settings := config.Settings{
+		MinutesBetweenRuns: 5,
+		DiscordWebhookURLs: []string{discordServer.URL},
+	}
+	app := NewWithClients(settings, scClient, dcClient)
+
+	// Run the check at 10:05 AM ET with zero anchor (should default to 10:00-10:05 window)
+	now := time.Date(2024, 1, 1, 10, 5, 0, 0, alerts.StockChartsTimeZone())
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
+	if err != nil {
+		t.Fatalf("SendAlertsOnceAt failed: %v", err)
+	}
+
+	// The alert should NOT be sent (it's outside the default 5-minute window)
+	if count != 0 {
+		t.Errorf("expected 0 alerts sent (old alert filtered), got %d", count)
+	}
+
+	if discordCalls != 0 {
+		t.Errorf("expected 0 Discord calls, got %d", discordCalls)
 	}
 }

@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -21,7 +20,7 @@ func main() {
 	// Load configuration from environment
 	settings, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load configuration: %v\n", err)
+		slog.Error("failed to load configuration", "error", err)
 		os.Exit(1)
 	}
 

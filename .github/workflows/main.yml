@@ -26,7 +26,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@41dfa10bad2ba3a3c63e49ff6b516faad5fc6f2d # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.5"
 
       - name: Check formatting
         run: make fmt
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@41dfa10bad2ba3a3c63e49ff6b516faad5fc6f2d # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.5"
 
       - name: Run golangci-lint
         run: make lint
@@ -56,7 +56,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@41dfa10bad2ba3a3c63e49ff6b516faad5fc6f2d # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.5"
 
       - name: Run tests
         run: make test
@@ -73,7 +73,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@41dfa10bad2ba3a3c63e49ff6b516faad5fc6f2d # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.5"
 
       - name: Enforce 95% line coverage
         run: make coverage
@@ -95,7 +95,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@41dfa10bad2ba3a3c63e49ff6b516faad5fc6f2d # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.5"
 
       - name: Check documentation
         run: make doc
@@ -110,7 +110,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@41dfa10bad2ba3a3c63e49ff6b516faad5fc6f2d # v5
         with:
-          go-version: "1.26"
+          go-version: "1.26.5"
 
       - name: Build binary
         run: make build
