@@ -21,14 +21,14 @@ func parseLogLevel(value string) slog.Level {
 	}
 }
 
-// InitLogging initializes the default slog logger with JSON output.
+// InitLogging initializes the default slog logger with plain text output.
 // The log level can be overridden via the LOG_LEVEL environment variable
 // (valid values: debug, info, warn, error; defaults to info).
 func InitLogging() {
 	level := parseLogLevel(os.Getenv("LOG_LEVEL"))
 
-	// Create a JSON handler writing to stdout
-	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	// Create a text handler writing to stdout
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: level,
 	})
 
