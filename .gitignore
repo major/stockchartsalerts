@@ -1,8 +1,10 @@
 .env
 .env.*
-/target/
 lcov.info
+coverage.out
 coverage.xml
 htmlcov/
+/stockchartsalerts
 .vscode/
 .idea/
+.slim/deepwork/

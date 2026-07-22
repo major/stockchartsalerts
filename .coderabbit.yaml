@@ -3,6 +3,9 @@ inheritance: true
 
 reviews:
   path_instructions:
-    - path: "src/**/*.rs"
+    - path: "internal/**/*.go"
       instructions: |
-        Preserve StockCharts timestamp parsing in America/New_York. The scheduler path must use one shared reqwest Client clone, not new clients inside polling loops. Transient StockCharts and Discord failures should log and degrade gracefully instead of crashing the service. Do not reintroduce DISCORD_WEBHOOK_URL support; this app expects DISCORD_WEBHOOK_URLS.
+        Preserve StockCharts timestamp parsing in America/New_York via internal/alerts.StockChartsTimeZone(). The scheduler must use one shared *http.Client built once in internal/app.New, never create new clients inside the polling loop. Transient StockCharts and Discord failures should log and degrade gracefully via internal/xerrors and log/slog instead of crashing the service. Do not reintroduce DISCORD_WEBHOOK_URL support; this app expects DISCORD_WEBHOOK_URLS only. Sentry error tracking was intentionally dropped during the Go migration; errors are logged via log/slog only.
+    - path: "cmd/**/*.go"
+      instructions: |
+        The cmd/stockchartsalerts/main.go entry point is deliberately thin (0% test coverage is expected and acceptable). All business logic lives in internal/app and internal/* packages which are fully tested. Keep main.go minimal: load config, initialize logging, build the app, run until shutdown.

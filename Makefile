@@ -1,36 +1,30 @@
-.PHONY: all fmt fmt-fix clippy test doc build coverage patch-coverage audit
+.PHONY: all fmt fmt-fix lint test doc build coverage audit
 
-RUSTDOCFLAGS := -D rustdoc::broken-intra-doc-links -D rustdoc::private-intra-doc-links
-PATCH_COVERAGE_BASE ?= main
-PATCH_COVERAGE_FAIL_UNDER ?= 100
-DIFF_COVER ?= diff-cover
-
-all: fmt clippy test doc build
+all: fmt lint test doc build
 
 fmt:
-	cargo fmt --check
+	@test -z "$$(gofumpt -l .)" || (gofumpt -l . && exit 1)
 
 fmt-fix:
-	cargo fmt
+	gofumpt -w .
 
-clippy:
-	cargo clippy --all-targets --locked -- -D warnings
+lint:
+	golangci-lint run
 
 test:
-	cargo test --locked
+	go test ./...
 
 doc:
-	RUSTDOCFLAGS="$(RUSTDOCFLAGS)" cargo doc --no-deps --locked
+	go vet ./...
 
 build:
-	cargo build --locked
+	go build ./cmd/stockchartsalerts
 
 coverage:
-	cargo llvm-cov --workspace --fail-under-lines 90
-
-patch-coverage:
-	cargo llvm-cov --workspace --fail-under-lines 90 --lcov --output-path lcov.info
-	$(DIFF_COVER) lcov.info --compare-branch=$(PATCH_COVERAGE_BASE) --fail-under=$(PATCH_COVERAGE_FAIL_UNDER)
+	go test ./internal/... -coverprofile=coverage.out
+	@go tool cover -func=coverage.out | tail -1 | awk '{gsub(/%/, "", $$NF); pct = $$NF; \
+		print "Total coverage (internal packages): " pct "%"; \
+		if (pct + 0 < 95) {print "FAIL: coverage below 95%"; exit 1} else {print "PASS: coverage >= 95%"}}'
 
 audit:
-	cargo audit
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...

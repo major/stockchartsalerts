@@ -10,8 +10,9 @@
 .env
 .env.*
 
-# Rust build output and coverage
-target/
+# Go build output and coverage
+coverage.out
+coverage.html
 lcov.info
 coverage.xml
 htmlcov/

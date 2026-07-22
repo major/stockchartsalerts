@@ -1,6 +1,6 @@
 # StockCharts Alerts
 
-StockCharts Alerts polls the [StockCharts predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) feed and sends new market alerts to Discord webhooks. It is a Rust 1.96 service built on Tokio and one shared `reqwest::Client` so the scheduled loop reuses connections instead of creating clients per poll.
+StockCharts Alerts polls the [StockCharts predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) feed and sends new market alerts to Discord webhooks. It is a Go 1.24+ service built with one shared `*http.Client` so the scheduled loop reuses connections instead of creating clients per poll.
 
 ## Configuration
 
@@ -11,35 +11,33 @@ Required:
 Optional:
 
 - `MINUTES_BETWEEN_RUNS`: polling interval in minutes, from 1 to 1440. Defaults to 5.
-- `SENTRY_DSN`: enables Sentry panic, application error, and Discord webhook failure reporting when set.
-- `SENTRY_ENVIRONMENT`: defaults to `production`.
-- `GIT_COMMIT` and `GIT_BRANCH`: injected by the container build and used for the Sentry release string.
+- `LOG_LEVEL`: structured logging level (debug, info, warn, error). Defaults to info.
+- `GIT_COMMIT` and `GIT_BRANCH`: injected by the container build and used for version logging.
 
 The legacy singular `DISCORD_WEBHOOK_URL` variable is not supported.
 
 ## Development
 
-This repository uses Rust 1.96 and edition 2024.
+This repository uses Go 1.24+ with toolchain 1.26.5.
 
 ```bash
 make all
 ```
 
-`make all` runs formatting checks, clippy with warnings denied, tests, documentation checks, and a locked build. Run coverage checks with:
+`make all` runs formatting checks, linting, tests, documentation checks, and a build. Run coverage checks with:
 
 ```bash
 make coverage
-make patch-coverage
 ```
 
-`make coverage` enforces 90 percent line coverage with `cargo llvm-cov`. `make patch-coverage` checks changed-line coverage against `main` with `diff-cover`; use `DIFF_COVER='uvx diff-cover'` if `diff-cover` is not installed as a standalone command. Public docstring coverage is enforced by the crate-level `#![deny(missing_docs)]` lint, and `make doc` also denies broken rustdoc links.
+`make coverage` enforces 95 percent line coverage with `go test -coverprofile`. Public docstring coverage is enforced by `golangci-lint` with the `revive` linter's `exported` rule, and `make lint` also checks for missing doc comments on exported symbols.
 
 Run locally with:
 
 ```bash
-DISCORD_WEBHOOK_URLS=https://discord.example/webhook cargo run --locked
+DISCORD_WEBHOOK_URLS=https://discord.example/webhook go run ./cmd/stockchartsalerts
 ```
 
 ## Container
 
-The GitHub Actions workflow builds `ghcr.io/major/stockchartsalerts:latest` with a Rust multi-stage Containerfile based on Red Hat hardened images. Build args `GIT_COMMIT` and `GIT_BRANCH` are preserved so Sentry releases are reported as `{git_branch}@{git_commit}`.
+The GitHub Actions workflow builds `ghcr.io/major/stockchartsalerts:latest` with a Go multi-stage Containerfile based on Red Hat hardened images. Build args `GIT_COMMIT` and `GIT_BRANCH` are preserved so version information is available at runtime.
