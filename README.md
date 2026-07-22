@@ -1,6 +1,6 @@
 # StockCharts Alerts
 
-StockCharts Alerts polls the [StockCharts predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) feed and sends new market alerts to Discord webhooks. It is a Go 1.24+ service built with one shared `*http.Client` so the scheduled loop reuses connections instead of creating clients per poll.
+StockCharts Alerts polls the [StockCharts predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) feed and sends new market alerts to Discord webhooks. It is a Go 1.25+ service built with one shared `*http.Client` so the scheduled loop reuses connections instead of creating clients per poll.
 
 ## Configuration
 
@@ -18,7 +18,7 @@ The legacy singular `DISCORD_WEBHOOK_URL` variable is not supported.
 
 ## Development
 
-This repository uses Go 1.24+ with toolchain 1.26.5.
+This repository uses Go 1.25+ with toolchain 1.26.5.
 
 ```bash
 make all

@@ -6,7 +6,7 @@
 
 StockCharts Alerts Bot: polls stockcharts.com predefined alerts, sends new ones to Discord webhooks, and runs as a scheduled loop in a container.
 
-- Go 1.24+, toolchain 1.26.5
+- Go 1.25+, toolchain 1.26.5
 - Entry point: `go run ./cmd/stockchartsalerts` in development, compiled binary at `/usr/local/bin/stockchartsalerts` in the container
 - Container: `ghcr.io/major/stockchartsalerts:latest`, built from `Containerfile` with Red Hat hardened Go images
 
@@ -138,7 +138,7 @@ All actions are SHA-pinned. This repository does not publish a module; avoid rel
 
 ## Code Style
 
-- Go 1.24+, toolchain 1.26.5.
+- Go 1.25+, toolchain 1.26.5.
 - `gofumpt` formatting (enforced via `make fmt` and pre-commit).
 - `golangci-lint` with warnings/lint errors treated as failures.
 - 100% exported-symbol godoc comments (enforced via `golangci-lint` + `revive` linter's `exported` rule).

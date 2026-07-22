@@ -7,26 +7,25 @@ import (
 	"strings"
 )
 
+// parseLogLevel converts a LOG_LEVEL string into an slog.Level, defaulting to Info for empty or unrecognized values.
+func parseLogLevel(value string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
 // InitLogging initializes the default slog logger with JSON output.
 // The log level can be overridden via the LOG_LEVEL environment variable
 // (valid values: debug, info, warn, error; defaults to info).
 func InitLogging() {
-	level := slog.LevelInfo
-
-	// Check for LOG_LEVEL environment variable
-	if levelStr, ok := os.LookupEnv("LOG_LEVEL"); ok {
-		levelStr = strings.ToLower(strings.TrimSpace(levelStr))
-		switch levelStr {
-		case "debug":
-			level = slog.LevelDebug
-		case "info":
-			level = slog.LevelInfo
-		case "warn":
-			level = slog.LevelWarn
-		case "error":
-			level = slog.LevelError
-		}
-	}
+	level := parseLogLevel(os.Getenv("LOG_LEVEL"))
 
 	// Create a JSON handler writing to stdout
 	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
