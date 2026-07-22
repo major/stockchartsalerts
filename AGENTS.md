@@ -145,3 +145,17 @@ All actions are SHA-pinned. This repository does not publish a module; avoid rel
 - `log/slog` for structured logging.
 - Small pure helper functions for parsing, filtering, and formatting so tests stay fast.
 - No runtime module dependencies (stdlib only; build tools like `gofumpt` and `govulncheck` are invoked via `go run`, not imported).
+
+## Repository Map
+
+A full codemap is available at `codemap.md` in the project root.
+
+Before working on any task, read `codemap.md` to understand:
+- Project architecture and entry points
+- Directory responsibilities and design patterns
+- Data flow and integration points between modules
+
+For deep work on a specific folder, also read that folder's `codemap.md`.
+
+Update the relevant codemap when a change affects architecture, directory
+responsibilities, data flow, or integration points.
