@@ -863,41 +863,52 @@ func TestRunUntilShutdownFiveErrorThreshold(t *testing.T) {
 	}
 }
 
-// TestSendAlertsOnceAtInvalidTimezone tests error handling when timezone loading fails.
-// This tests the error path in SendAlertsOnceAt (line 72-74).
-func TestSendAlertsOnceAtInvalidTimezone(t *testing.T) {
-	// Create a mock app with a custom timezone name that will fail to load
-	// We'll need to patch the alerts package's timezone loading, but since we can't
-	// easily do that, we'll test the error path by creating a scenario where
-	// time.LoadLocation would fail. However, since the code uses a hardcoded valid
-	// timezone name, we need to test the error handling logic directly.
-	//
-	// For now, we'll verify that the function handles the timezone correctly
-	// by testing with a valid timezone and ensuring no error occurs.
+// TestSendAlertsOnceAtStockChartsFailure tests that SendAlertsOnceAt returns
+// zero alerts and an error when the StockCharts fetch fails, without relying
+// on any live network access.
+func TestSendAlertsOnceAtStockChartsFailure(t *testing.T) {
+	// Mock StockCharts server that always fails.
+	stockchartsServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer stockchartsServer.Close()
+
+	// Mock Discord server; it should never be called since the fetch fails.
+	discordCalls := 0
+	discordServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		discordCalls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer discordServer.Close()
+
 	httpClient := &http.Client{}
-	scClient := stockcharts.NewClient(httpClient)
+	scClient := stockcharts.NewClient(httpClient).
+		WithAlertsURL(stockchartsServer.URL).
+		WithRetryDelays([]time.Duration{time.Millisecond, time.Millisecond})
 	dcClient := discord.NewClient(httpClient)
 
 	settings := config.Settings{
 		MinutesBetweenRuns: 5,
-		DiscordWebhookURLs: []string{"https://example.com/webhook"},
+		DiscordWebhookURLs: []string{discordServer.URL},
 	}
 	app := NewWithClients(settings, scClient, dcClient)
 
-	// Load the America/New_York timezone
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
 		t.Fatalf("failed to load timezone: %v", err)
 	}
 
-	// Pass a time in ET
 	now := time.Date(2026, 7, 21, 16, 25, 0, 0, loc)
-	count, _ := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
+	count, err := app.SendAlertsOnceAt(context.Background(), now, time.Time{})
 
-	// Should not error (StockCharts client will fail, but that's expected)
-	// The timezone loading should succeed
+	if err == nil {
+		t.Error("expected an error from a failing StockCharts fetch, got nil")
+	}
 	if count != 0 {
 		t.Errorf("expected 0 alerts on error, got %d", count)
+	}
+	if discordCalls != 0 {
+		t.Errorf("expected no Discord calls on StockCharts failure, got %d", discordCalls)
 	}
 }
 
