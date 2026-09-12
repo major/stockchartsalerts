@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/hi/go:1.26-builder@sha256:1e72a4a0881a8fb25e5f38434d55884318af37941a494d2cc44f5ba0c954e677 AS builder
+FROM registry.access.redhat.com/hi/go:1.26-builder@sha256:390c7b6d7d6aefa634ef862a129a282a6665525ef736d2238562ee1914af6840 AS builder
 
 WORKDIR /app
 
