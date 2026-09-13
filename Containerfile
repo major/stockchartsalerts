@@ -8,7 +8,7 @@ COPY internal ./internal
 
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/stockchartsalerts ./cmd/stockchartsalerts
 
-FROM registry.access.redhat.com/hi/core-runtime:latest@sha256:b9e0bf16ff3afe7f1a45451128a091af54065baaff80aec27ac18de7aca27253
+FROM registry.access.redhat.com/hi/core-runtime:latest@sha256:1171ea7227d7c06e2cce4b000c0e7f3d31c216fffd3bd7ad6e8dcc56de2a217f
 
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
