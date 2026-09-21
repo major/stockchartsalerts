@@ -6,9 +6,9 @@
 
 StockCharts Alerts Bot: polls stockcharts.com predefined alerts, sends new ones to Discord webhooks, and runs as a scheduled loop in a container.
 
-- Go 1.25+, toolchain 1.26.5
+- Requires Go 1.27.1
 - Entry point: `go run ./cmd/stockchartsalerts` in development, compiled binary at `/usr/local/bin/stockchartsalerts` in the container
-- Container: `ghcr.io/major/stockchartsalerts:latest`, built from `Containerfile` with Red Hat hardened Go images
+- Container: `ghcr.io/major/stockchartsalerts:latest`, built from `Containerfile` with an official pinned Go builder image and a Red Hat hardened runtime image
 
 ## Directory Layout
 
@@ -115,7 +115,7 @@ DISCORD_WEBHOOK_URLS=https://discord.example/webhook go run ./cmd/stockchartsale
 
 GitHub Actions:
 
-1. `.github/workflows/main.yml`: Linux Go quality gates (`fmt`, `lint`, `test`, `coverage`, `doc`, `build`) on Go 1.26, followed by the `container` job.
+1. `.github/workflows/main.yml`: Linux Go quality gates (`fmt`, `lint`, `test`, `coverage`, `doc`, `build`) on Go 1.27.1, followed by the `container` job.
 2. `.github/workflows/audit.yml`: `govulncheck` audit on go.mod/go.sum changes, manual dispatch, and a daily schedule.
 3. `container`: builds `Containerfile`, pushes `ghcr.io/major/stockchartsalerts:latest` only on `main`, then checks out `major/homehosted` and updates `apps/stockchartsalerts/helm/helmrelease.yaml` with the new image digest.
 
@@ -138,7 +138,7 @@ All actions are SHA-pinned. This repository does not publish a module; avoid rel
 
 ## Code Style
 
-- Go 1.25+, toolchain 1.26.5.
+- Requires Go 1.27.1.
 - `gofumpt` formatting (enforced via `make fmt` and pre-commit).
 - `golangci-lint` with warnings/lint errors treated as failures.
 - 100% exported-symbol godoc comments (enforced via `golangci-lint` + `revive` linter's `exported` rule).

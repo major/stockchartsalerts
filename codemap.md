@@ -13,7 +13,7 @@ process with bounded retry and backoff behavior.
   environment configuration, starts `app.App`, and handles SIGINT/SIGTERM.
 - `internal/app/app.go`: Scheduler and polling orchestration; wires one shared
   HTTP client into the StockCharts and Discord integrations.
-- `go.mod`: Go 1.26 module and toolchain definition.
+- `go.mod`: Module definition and required Go version (1.27.1).
 - `Makefile`: Formatting, linting, test, build, coverage, and vulnerability
   audit commands.
 - `Containerfile`: Production container build for the service binary.

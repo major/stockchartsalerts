@@ -1,6 +1,6 @@
 # StockCharts Alerts
 
-StockCharts Alerts polls the [StockCharts predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) feed and sends new market alerts to Discord webhooks. It is a Go 1.25+ service built with one shared `*http.Client` so the scheduled loop reuses connections instead of creating clients per poll.
+StockCharts Alerts polls the [StockCharts predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) feed and sends new market alerts to Discord webhooks. It is a Go 1.27.1 service built with one shared `*http.Client` so the scheduled loop reuses connections instead of creating clients per poll.
 
 ## Configuration
 
@@ -18,7 +18,7 @@ The legacy singular `DISCORD_WEBHOOK_URL` variable is not supported.
 
 ## Development
 
-This repository uses Go 1.25+ with toolchain 1.26.5.
+This repository requires Go 1.27.1.
 
 ```bash
 make all
@@ -40,4 +40,4 @@ DISCORD_WEBHOOK_URLS=https://discord.example/webhook go run ./cmd/stockchartsale
 
 ## Container
 
-The GitHub Actions workflow builds `ghcr.io/major/stockchartsalerts:latest` with a Go multi-stage Containerfile based on Red Hat hardened images. Build args `GIT_COMMIT` and `GIT_BRANCH` are preserved so version information is available at runtime.
+The GitHub Actions workflow builds `ghcr.io/major/stockchartsalerts:latest` with a multi-stage Containerfile that uses the official pinned Go image for the builder and a Red Hat hardened image for the production runtime. Build args `GIT_COMMIT` and `GIT_BRANCH` are preserved so version information is available at runtime.
