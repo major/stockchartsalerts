@@ -1,8 +1,6 @@
 module github.com/major/stockchartsalerts
 
-go 1.26.0
-
-toolchain go1.26.5
+go 1.27.1
 
 require (
 	golang.org/x/mod v0.38.0 // indirect
