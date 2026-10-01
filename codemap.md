@@ -2,60 +2,67 @@
 
 ## Project Responsibility
 
-This Go service polls StockCharts' predefined-alert endpoint, identifies alerts
-newer than the last successful check in Eastern Time, and posts each result to
-configured Discord webhooks. It runs as a long-lived, signal-aware container
-process with bounded retry and backoff behavior.
+This Python service polls StockCharts' predefined-alert endpoint, identifies
+alerts newer than its in-memory lookback anchor in Eastern Time, and posts each
+result to configured Discord webhooks. It is an async, signal-aware process
+with bounded fetch retries and scheduler backoff.
 
 ## System Entry Points
 
-- `cmd/stockchartsalerts/main.go`: Composition root; initializes logging, loads
-  environment configuration, starts `app.App`, and handles SIGINT/SIGTERM.
-- `internal/app/app.go`: Scheduler and polling orchestration; wires one shared
-  HTTP client into the StockCharts and Discord integrations.
-- `go.mod`: Module definition and required Go version (1.27.1).
-- `Makefile`: Formatting, linting, test, build, coverage, and vulnerability
-  audit commands.
-- `Containerfile`: Production container build for the service binary.
-- `.github/workflows/`: Quality, container publishing, deployment-update, and
-  scheduled vulnerability-audit automation.
+- `pyproject.toml`: Python project metadata, dependencies, tooling settings, and
+  the `stockchartsalerts` console script.
+- `uv.lock`: Locked dependency resolution used by `uv sync --locked`.
+- `src/stockchartsalerts/__main__.py`: Package command entry point.
+- `src/stockchartsalerts/app.py`: Async polling orchestration, shared client
+  lifecycle, lookback anchor, scheduler, backoff, and signal cancellation.
+- `Makefile`: Formatting, linting, type checking, tests, branch coverage, build,
+  and dependency audit commands.
 
 ## Primary Alert Flow
 
-1. The command initializes `log/slog`, loads validated environment settings,
-   constructs `app.App`, and waits for a termination signal.
-2. `app` immediately fetches StockCharts alerts, then repeats at the configured
-   interval with short retry delays after failures and a longer delay after five
-   consecutive failures.
-3. `stockcharts` performs the GET request and retry policy; `alerts` parses and
-   filters raw rows using the `America/New_York` timestamp context.
-4. `alerts` retains only rows newer than the previous successful poll and the
-   most recent fired alert(s) for each symbol.
-5. `discord` formats every selected alert and best-effort posts it to all
-   configured webhooks. The successful-poll anchor is advanced after a
-   successful fetch and processing pass.
+1. `__main__` initializes plain-text logging, loads validated environment
+   settings, and starts the async application.
+2. `app` creates one shared asynchronous `httpx` client, performs one startup
+   check, then schedules recurring checks and responds to SIGINT or SIGTERM.
+3. `stockcharts` fetches and decodes the StockCharts response with bounded
+   retries. `alerts` normalizes rows, parses timestamps in `America/New_York`,
+   and filters malformed or placeholder rows.
+4. `alerts` keeps only rows strictly newer than the lookback anchor and the
+   latest timestamp or tied timestamps for each case-sensitive symbol.
+5. `discord` builds the fixed webhook payload and posts sequentially to every
+   configured webhook on a best-effort basis. A successful fetch advances the
+   in-memory anchor even if a webhook post fails.
 
 ## Repository Directory Map
 
 | Directory | Responsibility summary | Detailed map |
 | --- | --- | --- |
-| `cmd/` | Contains the executable command tree and keeps process concerns separate from application logic. | [cmd/codemap.md](cmd/codemap.md) |
-| `cmd/stockchartsalerts/` | Thin composition root for logging, configuration, lifecycle signals, and application startup. | [cmd/stockchartsalerts/codemap.md](cmd/stockchartsalerts/codemap.md) |
-| `internal/` | Private application layer containing orchestration, domain logic, integrations, and shared infrastructure. | [internal/codemap.md](internal/codemap.md) |
-| `internal/app/` | Coordinates polling, alert selection, delivery, in-memory progress, backoff, and graceful shutdown. | [internal/app/codemap.md](internal/app/codemap.md) |
-| `internal/config/` | Converts environment variables into normalized, validated application settings. | [internal/config/codemap.md](internal/config/codemap.md) |
-| `internal/alerts/` | Normalizes StockCharts rows, parses Eastern Time timestamps, and selects new latest-per-symbol alerts. | [internal/alerts/codemap.md](internal/alerts/codemap.md) |
-| `internal/discord/` | Formats alerts into Discord webhook payloads and performs best-effort delivery. | [internal/discord/codemap.md](internal/discord/codemap.md) |
-| `internal/stockcharts/` | Fetches and decodes StockCharts alerts with headers, status handling, and retry delays. | [internal/stockcharts/codemap.md](internal/stockcharts/codemap.md) |
-| `internal/httpx/` | Builds the shared HTTP client and centralizes 2xx status validation. | [internal/httpx/codemap.md](internal/httpx/codemap.md) |
-| `internal/xerrors/` | Defines typed error categories and constructors shared across application boundaries. | [internal/xerrors/codemap.md](internal/xerrors/codemap.md) |
-| `internal/telemetry/` | Configures the process-wide structured logging handler and level. | [internal/telemetry/codemap.md](internal/telemetry/codemap.md) |
+| `src/stockchartsalerts/` | Python package and console entry point. | [Package modules below](#package-modules) |
+| `tests/` | Sociable tests organized by behavior. | Alert selection, configuration, polling, service lifecycle, delivery, and feed recovery. |
+| `docs/` | User-facing behavior contracts and operational details. | [docs/behaviors.md](docs/behaviors.md) |
+
+## Package Modules
+
+| Module | Responsibility |
+| --- | --- |
+| `__main__.py` | Console entry point and process startup. |
+| `app.py` | Polling, shared async client lifecycle, in-memory lookback state, scheduler, backoff, and graceful cancellation. |
+| `config.py` | Environment parsing, normalization, defaults, and validation. |
+| `alerts.py` | Alert row defaults, filtering, timestamp parsing, and latest-per-symbol selection. |
+| `stockcharts.py` | StockCharts HTTP request, response decoding, and fetch retries. |
+| `discord.py` | Discord payload formatting and sequential best-effort delivery. |
+| `httpx_client.py` | Shared async HTTP client defaults and response status checks. |
+| `telemetry.py` | Plain-text logging setup and log level selection. |
 
 ## Operational Constraints
 
-- All StockCharts timestamps must be handled in `America/New_York`.
-- `DISCORD_WEBHOOK_URLS` is the only supported webhook configuration variable.
-- The polling loop reuses the HTTP client created in `app.New`; it must not
-  allocate clients per poll.
-- StockCharts and Discord failures are logged and handled without crashing the
-  process where possible.
+- All StockCharts timestamps use `America/New_York`.
+- `DISCORD_WEBHOOK_URLS` is the only supported webhook setting.
+- The shared async `httpx` client is created at application startup, reused for
+  both integrations, and closed at shutdown. Do not create clients in the poll
+  loop.
+- SIGINT and SIGTERM cancel the async polling work and allow client cleanup.
+- StockCharts fetch failures and individual Discord delivery failures are
+  handled without crashing the service where possible.
+- Polling progress is in memory only. There is no durable watermark, Discord
+  retry, or guaranteed delivery.
