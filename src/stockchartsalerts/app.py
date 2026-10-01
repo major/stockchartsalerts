@@ -52,9 +52,14 @@ class App:
             previous_run = (now.astimezone(UTC) - timedelta(seconds=self.interval_seconds)).astimezone(_EASTERN)
 
         rows = await stockcharts.fetch_alerts(self.client, sleep=self.sleep)
-        valid_alerts = alerts.filter_alerts(rows)
-        selected_alerts = alerts.new_alerts_since(valid_alerts, previous_run)
-        for alert in selected_alerts:
+        selection = alerts.select_alerts(rows, previous_run)
+        if selection.malformed_rows or selection.invalid_timestamps:
+            logger.warning(
+                "StockCharts rows rejected; malformed_rows=%d invalid_timestamps=%d",
+                selection.malformed_rows,
+                selection.invalid_timestamps,
+            )
+        for alert in selection.selected:
             await discord.send_alert_to_webhooks(
                 self.client,
                 alert,
@@ -62,14 +67,16 @@ class App:
             )
 
         self.last_success = now
-        return len(selected_alerts)
+        return len(selection.selected)
 
     async def run(self) -> None:
         """Poll immediately, then repeat at the configured interval or backoff."""
         try:
             count = await self.poll(self.clock())
-        except Exception:
-            logger.error("initial alert check failed")
+        except stockcharts.FetchError as error:
+            logger.error("initial alert check failed: %s", str(error))
+        except Exception as error:
+            logger.error("initial alert check failed; error_type=%s", type(error).__name__)
         else:
             logger.info("initial alert check completed; alerts_sent=%d", count)
 
@@ -79,11 +86,20 @@ class App:
             await self.sleep(next_delay)
             try:
                 count = await self.poll(self.clock())
-            except Exception:
+            except stockcharts.FetchError as error:
                 consecutive_errors += 1
                 logger.error(
-                    "alert check failed; consecutive_errors=%d",
+                    "alert check failed; consecutive_errors=%d; error=%s",
                     consecutive_errors,
+                    str(error),
+                )
+                next_delay = 300 if consecutive_errors >= 5 else 60
+            except Exception as error:
+                consecutive_errors += 1
+                logger.error(
+                    "alert check failed; consecutive_errors=%d; error_type=%s",
+                    consecutive_errors,
+                    type(error).__name__,
                 )
                 next_delay = 300 if consecutive_errors >= 5 else 60
             else:

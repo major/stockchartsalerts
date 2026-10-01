@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -138,6 +140,94 @@ def test_poll_rejects_naive_time_without_fetching() -> None:
     asyncio.run(scenario())
 
 
+def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        discord_requests: list[httpx.Request] = []
+        rows = [
+            {
+                "alert": "Healthy neighbor",
+                "bearish": "no",
+                "lastfired": "1 Jan 2024, 10:02am",
+                "symbol": "GOOD",
+            },
+            {
+                "alert": "Superseded alert",
+                "bearish": "no",
+                "lastfired": "1 Jan 2024, 10:01am",
+                "symbol": "TIED",
+            },
+            {
+                "alert": "Latest alert",
+                "bearish": "no",
+                "lastfired": "1 Jan 2024, 10:03am",
+                "symbol": "TIED",
+            },
+            {
+                "alert": "Latest tie",
+                "bearish": "yes",
+                "lastfired": "1 Jan 2024, 10:03am",
+                "symbol": "TIED",
+            },
+            None,
+            {
+                "alert": 7,
+                "ALERT": "malformed-secret-alert",
+                "lastfired": "1 Jan 2024, 10:02am",
+                "symbol": "malformed-secret-symbol",
+            },
+            {
+                "alert": "Overflow alert",
+                "lastfired": "31 Dec 9999, 11:59pm",
+                "symbol": "OVERFLOW_SECRET",
+            },
+            {
+                "alert": "Invalid timestamp alert",
+                "lastfired": "not a timestamp secret",
+                "symbol": "INVALID_SECRET",
+            },
+            {"alert": "Missing timestamp alert", "symbol": "MISSING"},
+            {
+                "alert": " There are no alerts today ",
+                "lastfired": "not a timestamp",
+                "symbol": "PLACEHOLDER",
+            },
+        ]
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            if request.url.host == "stockcharts.com":
+                return httpx.Response(200, json=rows)
+
+            discord_requests.append(request)
+            return httpx.Response(204)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+            application = App(_settings(), client, sleep=_no_wait)
+            assert await application.poll(datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)) == 3
+
+        assert [json.loads(request.content)["content"] for request in discord_requests] == [
+            "💚  Healthy neighbor",
+            "💚  Latest alert",
+            "🔴  Latest tie",
+        ]
+
+    with caplog.at_level(logging.WARNING, logger="stockchartsalerts.app"):
+        asyncio.run(scenario())
+
+    rejection_logs = [
+        record
+        for record in caplog.records
+        if record.name == "stockchartsalerts.app" and record.levelno == logging.WARNING
+    ]
+    assert len(rejection_logs) == 1
+    assert rejection_logs[0].getMessage() == ("StockCharts rows rejected; malformed_rows=2 invalid_timestamps=3")
+    assert "malformed-secret" not in caplog.text
+    assert "OVERFLOW_SECRET" not in caplog.text
+    assert "INVALID_SECRET" not in caplog.text
+    assert "not a timestamp secret" not in caplog.text
+
+
 @pytest.mark.parametrize(
     ("now", "rows", "expected_alert"),
     [
@@ -199,7 +289,9 @@ def test_initial_lookback_uses_elapsed_time_across_dst(
     asyncio.run(scenario())
 
 
-def test_startup_failure_keeps_interval_and_recurring_errors_back_off() -> None:
+def test_startup_failure_keeps_interval_and_recurring_errors_back_off(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     async def scenario() -> None:
         delays: list[float] = []
         events: list[str] = []
@@ -207,7 +299,7 @@ def test_startup_failure_keeps_interval_and_recurring_errors_back_off() -> None:
         def always_fail(request: httpx.Request) -> httpx.Response:
             assert request.url.host == "stockcharts.com"
             events.append("fetch")
-            return httpx.Response(503)
+            return httpx.Response(503, text="upstream-private-response")
 
         async def controlled_sleep(seconds: float) -> None:
             if seconds > 4:
@@ -217,15 +309,16 @@ def test_startup_failure_keeps_interval_and_recurring_errors_back_off() -> None:
                     raise asyncio.CancelledError
 
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
-        async with httpx.AsyncClient(transport=httpx.MockTransport(always_fail)) as client:
-            application = App(
-                _settings(),
-                client,
-                clock=lambda: now,
-                sleep=controlled_sleep,
-            )
-            with pytest.raises(asyncio.CancelledError):
-                await application.run()
+        with caplog.at_level(logging.ERROR, logger="stockchartsalerts.app"):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(always_fail)) as client:
+                application = App(
+                    _settings(),
+                    client,
+                    clock=lambda: now,
+                    sleep=controlled_sleep,
+                )
+                with pytest.raises(asyncio.CancelledError):
+                    await application.run()
 
         # The startup failure does not count toward recurring backoff. Five
         # recurring failures change the next wait from 60 to 300 seconds.
@@ -233,6 +326,74 @@ def test_startup_failure_keeps_interval_and_recurring_errors_back_off() -> None:
         assert delays == [300, 60, 60, 60, 60, 300]
 
     asyncio.run(scenario())
+    app_error_logs = [
+        record
+        for record in caplog.records
+        if record.name == "stockchartsalerts.app" and record.levelno == logging.ERROR
+    ]
+    assert [record.getMessage() for record in app_error_logs] == [
+        "initial alert check failed: StockCharts returned HTTP status 503",
+        *[
+            f"alert check failed; consecutive_errors={count}; error=StockCharts returned HTTP status 503"
+            for count in range(1, 6)
+        ],
+    ]
+    assert "upstream-private-response" not in caplog.text
+    assert all(record.exc_info is None for record in app_error_logs)
+
+
+def test_scheduler_logs_unexpected_exception_types_and_continues(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        clock_calls = 0
+        delays: list[float] = []
+        now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
+
+        def changing_clock() -> datetime:
+            nonlocal clock_calls
+            clock_calls += 1
+            if clock_calls == 1:
+                raise RuntimeError("startup-private-detail")
+            if clock_calls == 2:
+                return now
+            raise ValueError("recurring-private-detail")
+
+        def empty_feed(request: httpx.Request) -> httpx.Response:
+            assert request.url.host == "stockcharts.com"
+            return httpx.Response(200, json=[])
+
+        async def controlled_sleep(seconds: float) -> None:
+            delays.append(seconds)
+            if len(delays) == 3:
+                raise asyncio.CancelledError
+
+        with caplog.at_level(logging.ERROR, logger="stockchartsalerts.app"):
+            async with httpx.AsyncClient(transport=httpx.MockTransport(empty_feed)) as client:
+                application = App(
+                    _settings(),
+                    client,
+                    clock=changing_clock,
+                    sleep=controlled_sleep,
+                )
+                with pytest.raises(asyncio.CancelledError):
+                    await application.run()
+
+        assert delays == [300, 300, 60]
+
+    asyncio.run(scenario())
+    app_error_logs = [
+        record
+        for record in caplog.records
+        if record.name == "stockchartsalerts.app" and record.levelno == logging.ERROR
+    ]
+    assert [record.getMessage() for record in app_error_logs] == [
+        "initial alert check failed; error_type=RuntimeError",
+        "alert check failed; consecutive_errors=1; error_type=ValueError",
+    ]
+    assert "startup-private-detail" not in caplog.text
+    assert "recurring-private-detail" not in caplog.text
+    assert all(record.exc_info is None for record in app_error_logs)
 
 
 def test_success_restores_the_regular_interval_after_a_recurring_failure() -> None:

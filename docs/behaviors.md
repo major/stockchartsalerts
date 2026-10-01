@@ -9,9 +9,10 @@ networking, scheduling, and process lifecycle.
 
 ### Input rows and normalization
 
-- The StockCharts response is an array of alert rows. A malformed row, including
-  invalid JSON or a non-string value for a recognized string field, is logged
-  and skipped. A malformed row does not invalidate other rows.
+- The StockCharts response is an array of alert rows. A non-object entry or a
+  non-string value for a recognized string field is skipped as a malformed row.
+  A malformed row does not invalidate other rows. Invalid JSON or a non-array
+  response fails the StockCharts fetch.
 - Recognized field names are `alert`, `bearish`, `lastfired`, and `symbol`,
   matched without regard to case. Unrecognized fields are ignored.
 - String values are trimmed. An absent, `null`, empty, or whitespace-only value
@@ -34,7 +35,14 @@ networking, scheduling, and process lifecycle.
 - During the fall daylight-saving overlap, choose the earliest corresponding
   instant. For example, `3 Nov 2024, 1:30am` means the first 1:30 a.m. in New
   York, with the EDT offset.
-- An unparseable timestamp is logged and that row is skipped.
+- An invalid or unrepresentable timestamp, including a timezone conversion that
+  exceeds Python's `datetime` range, is skipped.
+- When feed rows are rejected, the poll emits at most one warning with aggregate
+  counts for malformed rows and invalid timestamps. The warning does not include
+  raw row values, symbols, timestamps, or exception text. Placeholder rows and
+  valid rows superseded by a newer alert do not increase these counts.
+- A malformed row counts once even if several recognized fields are invalid.
+  Invalid timestamps are counted only for normalized, non-placeholder rows.
 
 ### New alert selection
 
