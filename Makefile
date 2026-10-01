@@ -1,4 +1,4 @@
-.PHONY: all fmt fmt-fix lint types test build coverage audit
+.PHONY: all fmt fmt-fix lint types test build coverage audit mutate
 
 all: fmt lint types coverage build
 
@@ -26,3 +26,6 @@ build:
 
 audit:
 	uv run --locked pip-audit
+
+mutate:
+	uv run --locked mutmut run
