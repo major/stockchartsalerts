@@ -16,6 +16,8 @@ _USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/
 
 
 def test_fetch_alerts_sends_required_request_and_returns_json_array() -> None:
+    """Use the required request headers and return decoded feed rows."""
+
     async def scenario() -> None:
         async def handle(request: httpx2.Request) -> httpx2.Response:
             assert request.method == "GET"
@@ -33,6 +35,8 @@ def test_fetch_alerts_sends_required_request_and_returns_json_array() -> None:
 def test_fetch_alerts_retries_status_failures_with_two_and_four_second_delays(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Retry failed response statuses using the configured delays."""
+
     async def scenario() -> None:
         requests = 0
         delays: list[float] = []
@@ -72,6 +76,8 @@ def test_fetch_alerts_retries_malformed_or_non_array_json(
     failure_reason: str,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Retry and sanitize malformed or non-array JSON responses."""
+
     async def scenario() -> None:
         requests = 0
         delays: list[float] = []
@@ -108,6 +114,8 @@ def test_fetch_alerts_retries_malformed_or_non_array_json(
 
 
 def test_fetch_alerts_sanitizes_transport_errors_and_retries(caplog: pytest.LogCaptureFixture) -> None:
+    """Retry transport failures without exposing their details."""
+
     async def scenario() -> None:
         requests = 0
         delays: list[float] = []
@@ -145,6 +153,8 @@ def test_fetch_alerts_sanitizes_transport_errors_and_retries(caplog: pytest.LogC
 def test_fetch_alerts_deadline_covers_response_body_read_and_retries(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Apply the request deadline through response-body reads and retries."""
+
     async def scenario() -> None:
         requests = 0
         body_reads = 0
@@ -193,6 +203,8 @@ def test_fetch_alerts_deadline_covers_response_body_read_and_retries(
 
 
 def test_fetch_alerts_propagates_cancellation_during_request() -> None:
+    """Propagate cancellation during a request instead of retrying."""
+
     async def scenario() -> None:
         started = asyncio.Event()
 

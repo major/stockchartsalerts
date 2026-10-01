@@ -34,6 +34,7 @@ class App:
         clock: Clock = _eastern_now,
         sleep: Sleep = asyncio.sleep,
     ) -> None:
+        """Initialize polling with the shared client and injectable timing functions."""
         self.settings = settings
         self.client = client
         self.clock = clock
