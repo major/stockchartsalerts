@@ -6,8 +6,59 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from stockchartsalerts import Alert, filter_alerts, new_alerts_since, parse_timestamp
+from stockchartsalerts.alerts import select_alerts
 
 ET = ZoneInfo("America/New_York")
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [
+        pytest.param(
+            [
+                {"alert": " There are no alerts today "},
+                {
+                    "alert": "First healthy alert",
+                    "lastfired": "31 Jul 2024, 9:30am",
+                    "symbol": "FIRST",
+                },
+                {
+                    "alert": "Second healthy alert",
+                    "lastfired": "31 Jul 2024, 9:31am",
+                    "symbol": "SECOND",
+                },
+            ],
+            id="leading-placeholder",
+        ),
+        pytest.param(
+            [
+                {
+                    "alert": "First healthy alert",
+                    "lastfired": "31 Jul 2024, 9:30am",
+                    "symbol": "FIRST",
+                },
+                {"alert": "There are no alerts today"},
+                {
+                    "alert": "Second healthy alert",
+                    "lastfired": "31 Jul 2024, 9:31am",
+                    "symbol": "SECOND",
+                },
+            ],
+            id="middle-placeholder",
+        ),
+    ],
+)
+def test_placeholder_does_not_stop_filtering_or_selection(rows: list[object]) -> None:
+    """Healthy rows after a placeholder remain selected in input order."""
+    expected = ["First healthy alert", "Second healthy alert"]
+
+    filtered = filter_alerts(rows)
+    selection = select_alerts(rows, datetime(2024, 7, 31, 9, 29, tzinfo=ET))
+
+    assert [alert.alert for alert in filtered] == expected
+    assert [alert.alert for alert in selection.selected] == expected
+    assert selection.malformed_rows == 0
+    assert selection.invalid_timestamps == 0
 
 
 def test_feed_selection_normalizes_rows_and_discards_invalid_alerts() -> None:

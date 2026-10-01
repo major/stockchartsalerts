@@ -228,6 +228,47 @@ def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
     assert "not a timestamp secret" not in caplog.text
 
 
+def test_poll_delivers_healthy_alert_after_placeholder_without_rejection_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        discord_requests: list[httpx2.Request] = []
+        rows = [
+            {"alert": "There are no alerts today"},
+            {
+                "alert": "Healthy alert after placeholder",
+                "bearish": "no",
+                "lastfired": "1 Jan 2024, 10:02am",
+                "symbol": "GOOD",
+            },
+        ]
+
+        def handle(request: httpx2.Request) -> httpx2.Response:
+            if request.url.host == "stockcharts.com":
+                return httpx2.Response(200, json=rows)
+
+            discord_requests.append(request)
+            return httpx2.Response(204)
+
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
+            application = App(_settings(), client, sleep=_no_wait)
+            # The initial lookback anchor is exactly 10:00 a.m. Eastern.
+            assert await application.poll(datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)) == 1
+
+        assert [json.loads(request.content)["content"] for request in discord_requests] == [
+            "💚  Healthy alert after placeholder"
+        ]
+
+    with caplog.at_level(logging.WARNING, logger="stockchartsalerts.app"):
+        asyncio.run(scenario())
+
+    assert not [
+        record
+        for record in caplog.records
+        if record.name == "stockchartsalerts.app" and record.levelno == logging.WARNING
+    ]
+
+
 @pytest.mark.parametrize(
     ("now", "rows", "expected_alert"),
     [
