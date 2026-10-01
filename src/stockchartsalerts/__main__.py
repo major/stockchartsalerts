@@ -49,7 +49,7 @@ async def async_main(
 
         configure_logging(settings.log_level)
         logger.info(
-            "starting StockCharts alerts; release=%s@%s",
+            "=== Starting StockCharts Alerts ===\nBranch: %s\nCommit: %s\n====================================",
             settings.git_branch,
             settings.git_commit,
         )

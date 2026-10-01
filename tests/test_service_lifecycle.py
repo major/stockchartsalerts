@@ -46,7 +46,7 @@ def test_client_startup_failure_logs_only_the_exception_type(
 
     caplog.set_level(logging.DEBUG, logger="httpx2")
     caplog.set_level(logging.DEBUG, logger="httpcore2")
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.INFO):
         result = asyncio.run(
             async_main(
                 {"DISCORD_WEBHOOK_URLS": "https://discord.test/webhook/token-secret"},
@@ -57,6 +57,8 @@ def test_client_startup_failure_logs_only_the_exception_type(
     assert result == 1
     assert "application failed" in caplog.text
     assert "error=RuntimeError" in caplog.text
+    assert "Branch: unknown" in caplog.text
+    assert "Commit: unknown" in caplog.text
     assert "discord.test" not in caplog.text
     assert "token-secret" not in caplog.text
 
@@ -64,6 +66,8 @@ def test_client_startup_failure_logs_only_the_exception_type(
 def test_sigterm_cancels_poll_and_closes_the_shared_client(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    commit = "0123456789abcdef0123456789abcdef01234567"
+
     async def scenario() -> None:
         request_started = asyncio.Event()
         clients: list[httpx2.AsyncClient] = []
@@ -83,7 +87,7 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
                 {
                     "DISCORD_WEBHOOK_URLS": "https://discord.test/webhook",
                     "GIT_BRANCH": "release",
-                    "GIT_COMMIT": "abc123",
+                    "GIT_COMMIT": commit,
                 },
                 client_factory=create_client,
             )
@@ -100,7 +104,7 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
     with caplog.at_level(logging.INFO):
         asyncio.run(scenario())
 
-    assert "release@abc123" in caplog.text
+    assert f"Branch: release\nCommit: {commit}" in caplog.text
     assert "shutdown signal received; exiting" in caplog.text
 
 
