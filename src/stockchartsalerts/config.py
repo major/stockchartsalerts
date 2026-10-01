@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 _INTEGER = re.compile(r"[+-]?[0-9]+")
 _LOG_LEVELS = frozenset({"debug", "info", "warn", "error"})
+_MAX_MINUTES_BETWEEN_RUNS = 1440
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -31,8 +32,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     else:
         minutes_between_runs = 5
 
-    if not 1 <= minutes_between_runs <= 1440:
-        raise ValueError("MINUTES_BETWEEN_RUNS must be between 1 and 1440")
+    if not 1 <= minutes_between_runs <= _MAX_MINUTES_BETWEEN_RUNS:
+        raise ValueError(f"MINUTES_BETWEEN_RUNS must be between 1 and {_MAX_MINUTES_BETWEEN_RUNS}")
 
     raw_webhook_urls = env.get("DISCORD_WEBHOOK_URLS", "")
     if not isinstance(raw_webhook_urls, str):

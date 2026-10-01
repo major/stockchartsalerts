@@ -15,6 +15,7 @@ from stockchartsalerts.config import Settings
 
 logger = logging.getLogger(__name__)
 _EASTERN = ZoneInfo("America/New_York")
+_LONG_BACKOFF_FAILURE_THRESHOLD = 5
 Clock = Callable[[], datetime]
 Sleep = Callable[[float], Awaitable[None]]
 
@@ -95,7 +96,7 @@ class App:
                     consecutive_errors,
                     str(error),
                 )
-                next_delay = 300 if consecutive_errors >= 5 else 60
+                next_delay = 300 if consecutive_errors >= _LONG_BACKOFF_FAILURE_THRESHOLD else 60
             # Recover from ordinary poll failures without exposing exception details.
             except Exception as error:  # noqa: BLE001
                 consecutive_errors += 1
@@ -104,7 +105,7 @@ class App:
                     consecutive_errors,
                     type(error).__name__,
                 )
-                next_delay = 300 if consecutive_errors >= 5 else 60
+                next_delay = 300 if consecutive_errors >= _LONG_BACKOFF_FAILURE_THRESHOLD else 60
             else:
                 consecutive_errors = 0
                 next_delay = self.interval_seconds

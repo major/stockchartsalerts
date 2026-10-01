@@ -13,6 +13,7 @@ from stockchartsalerts.stockcharts import DEFAULT_ENDPOINT, FetchError, fetch_al
 
 _REFERER = "https://stockcharts.com/freecharts/alertsummary.html"
 _USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0"
+_EXPECTED_TOTAL_ATTEMPTS = 3
 
 
 def test_fetch_alerts_sends_required_request_and_returns_json_array() -> None:
@@ -44,7 +45,7 @@ def test_fetch_alerts_retries_status_failures_with_two_and_four_second_delays(
         def handle(_request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             requests += 1
-            if requests < 3:
+            if requests < _EXPECTED_TOTAL_ATTEMPTS:
                 return httpx2.Response(503)
             return httpx2.Response(201, json=[])
 
@@ -54,7 +55,7 @@ def test_fetch_alerts_retries_status_failures_with_two_and_four_second_delays(
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             assert await fetch_alerts(client, sleep=record_sleep, endpoint="https://feed.test") == []
 
-        assert requests == 3
+        assert requests == _EXPECTED_TOTAL_ATTEMPTS
         assert delays == [2.0, 4.0]
 
     with caplog.at_level(logging.WARNING):
@@ -98,7 +99,7 @@ def test_fetch_alerts_retries_malformed_or_non_array_json(
                     endpoint="https://feed.test/secret?token=private",
                 )
 
-        assert requests == 3
+        assert requests == _EXPECTED_TOTAL_ATTEMPTS
         assert delays == [2.0, 4.0]
         assert failure_reason in str(captured.value)
         assert "secret" not in str(captured.value)
@@ -136,7 +137,7 @@ def test_fetch_alerts_sanitizes_transport_errors_and_retries(caplog: pytest.LogC
                     endpoint="https://feed.test/secret?token=private",
                 )
 
-        assert requests == 3
+        assert requests == _EXPECTED_TOTAL_ATTEMPTS
         assert delays == [2.0, 4.0]
         assert str(captured.value) == "StockCharts request failed"
         assert "secret" not in str(captured.value)
@@ -187,8 +188,8 @@ def test_fetch_alerts_deadline_covers_response_body_read_and_retries(
                     request_timeout=0.0,
                 )
 
-        assert requests == 3
-        assert body_reads == 3
+        assert requests == _EXPECTED_TOTAL_ATTEMPTS
+        assert body_reads == _EXPECTED_TOTAL_ATTEMPTS
         assert delays == [2.0, 4.0]
         assert str(captured.value) == "StockCharts request failed"
         assert "private" not in str(captured.value)
