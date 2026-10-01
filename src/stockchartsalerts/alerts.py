@@ -184,7 +184,7 @@ def parse_timestamp(text: str) -> datetime:
     nonexistent spring-forward times follow Go's backward normalization.
     """
     if not isinstance(text, str):
-        raise _UnsupportedTimestampError()
+        raise _UnsupportedTimestampError
 
     wall_time = _parse_stockcharts_wall_time(text)
     return _resolve_stockcharts_wall_time(wall_time, text)
@@ -192,7 +192,7 @@ def parse_timestamp(text: str) -> datetime:
 
 def _new_alerts_since(alerts: Sequence[Alert], previous_run: datetime) -> tuple[list[Alert], int]:
     if previous_run.tzinfo is None or previous_run.utcoffset() is None:
-        raise _NaivePreviousRunError()
+        raise _NaivePreviousRunError
     previous_instant = previous_run.astimezone(UTC)
 
     newer: list[tuple[Alert, datetime]] = []

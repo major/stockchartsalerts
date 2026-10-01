@@ -68,7 +68,7 @@ async def fetch_alerts(
             logger.warning("StockCharts fetch failed; %s; retrying attempt=%d", error, attempt + 1)
             await sleep(_RETRY_DELAYS[attempt])
 
-    raise _UnreachableRetryStateError()
+    raise _UnreachableRetryStateError
 
 
 async def _fetch_once(

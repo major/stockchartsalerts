@@ -45,17 +45,17 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     if "MINUTES_BETWEEN_RUNS" in env:
         raw_minutes = env["MINUTES_BETWEEN_RUNS"]
         if not isinstance(raw_minutes, str) or _INTEGER.fullmatch(raw_minutes) is None:
-            raise _InvalidPollingIntervalError()
+            raise _InvalidPollingIntervalError
         minutes_between_runs = int(raw_minutes)
     else:
         minutes_between_runs = 5
 
     if not 1 <= minutes_between_runs <= _MAX_MINUTES_BETWEEN_RUNS:
-        raise _PollingIntervalOutOfRangeError()
+        raise _PollingIntervalOutOfRangeError
 
     raw_webhook_urls = env.get("DISCORD_WEBHOOK_URLS", "")
     if not isinstance(raw_webhook_urls, str):
-        raise _InvalidWebhookUrlsError()
+        raise _InvalidWebhookUrlsError
 
     webhook_urls: list[str] = []
     seen: set[str] = set()
@@ -65,7 +65,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
             seen.add(normalized_url)
             webhook_urls.append(normalized_url)
     if not webhook_urls:
-        raise _InvalidWebhookUrlsError()
+        raise _InvalidWebhookUrlsError
 
     git_commit = env.get("GIT_COMMIT", "unknown").strip() or "unknown"
     git_branch = env.get("GIT_BRANCH", "unknown").strip() or "unknown"
