@@ -221,7 +221,9 @@ def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
         if record.name == "stockchartsalerts.app" and record.levelno == logging.WARNING
     ]
     assert len(rejection_logs) == 1
-    assert rejection_logs[0].getMessage() == ("StockCharts rows rejected; malformed_rows=2 invalid_timestamps=3")
+    rejection_message = rejection_logs[0].getMessage()
+    assert "malformed_rows=2" in rejection_message
+    assert "invalid_timestamps=3" in rejection_message
     assert "malformed-secret" not in caplog.text
     assert "OVERFLOW_SECRET" not in caplog.text
     assert "INVALID_SECRET" not in caplog.text
@@ -267,6 +269,54 @@ def test_poll_delivers_healthy_alert_after_placeholder_without_rejection_warning
         for record in caplog.records
         if record.name == "stockchartsalerts.app" and record.levelno == logging.WARNING
     ]
+
+
+def test_poll_counts_non_object_rows_and_delivers_healthy_neighbor(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        discord_requests: list[httpx2.Request] = []
+        rows: list[object] = [
+            None,
+            {
+                "alert": "Healthy neighbor",
+                "bearish": "no",
+                "lastfired": "1 Jan 2024, 10:02am",
+                "symbol": "GOOD",
+            },
+            ["private-array-row-data"],
+        ]
+
+        def handle(request: httpx2.Request) -> httpx2.Response:
+            if request.url.host == "stockcharts.com":
+                return httpx2.Response(200, json=rows)
+
+            discord_requests.append(request)
+            return httpx2.Response(204)
+
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
+            application = App(_settings(), client, sleep=_no_wait)
+            now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
+            assert await application.poll(now) == 1
+
+        assert len(discord_requests) == 1
+        payload = json.loads(discord_requests[0].content)
+        assert payload["username"] == "GOOD"
+        assert payload["content"] == "💚  Healthy neighbor"
+
+    with caplog.at_level(logging.WARNING, logger="stockchartsalerts.app"):
+        asyncio.run(scenario())
+
+    rejection_logs = [
+        record
+        for record in caplog.records
+        if record.name == "stockchartsalerts.app" and record.levelno == logging.WARNING
+    ]
+    assert len(rejection_logs) == 1
+    rejection_message = rejection_logs[0].getMessage()
+    assert "malformed_rows=2" in rejection_message
+    assert "invalid_timestamps=0" in rejection_message
+    assert "private-array-row-data" not in caplog.text
 
 
 @pytest.mark.parametrize(

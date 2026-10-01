@@ -69,6 +69,11 @@ networking, scheduling, and process lifecycle.
   `THE DOW, THE DOW IS ABOVE `. Leave all other alert text unchanged.
 - Any 2xx HTTP response is successful. A failure for one webhook is logged and
   does not prevent attempts to the remaining webhooks.
+- Delivery log records include the one-based `webhook=<index>/<total>` and
+  `symbol=<symbol>` fields. Successful posts are logged at info level. Failed
+  HTTP responses include `status=<code>`, and caught request errors include
+  `error=<exception type>`. Logs do not include webhook URLs, hostnames,
+  credentials, or exception messages.
 - Discord posts are not retried. Delivery is best effort, not guaranteed.
 
 ### Poll anchor and delivery consequences
