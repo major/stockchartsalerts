@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import httpx2
 
-from stockchartsalerts.alerts import Alert
 from stockchartsalerts.httpx_client import REQUEST_TIMEOUT_SECONDS
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from stockchartsalerts.alerts import Alert
 
 logger = logging.getLogger(__name__)
 _AVATAR_URL = "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png"

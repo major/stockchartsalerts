@@ -6,9 +6,12 @@ import asyncio
 import logging
 import os
 import signal
-from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING
 
-import httpx2
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
+    import httpx2
 
 from stockchartsalerts.app import App
 from stockchartsalerts.config import load_settings

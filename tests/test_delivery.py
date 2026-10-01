@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
 from contextlib import suppress
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import httpx2
 import pytest
@@ -17,6 +17,9 @@ from stockchartsalerts.app import App
 from stockchartsalerts.config import Settings
 from stockchartsalerts.discord import send_alert_to_webhooks
 from stockchartsalerts.telemetry import configure_logging
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 
 @pytest.mark.parametrize(

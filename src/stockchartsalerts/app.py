@@ -6,12 +6,15 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-import httpx2
-
 from stockchartsalerts import alerts, discord, stockcharts
-from stockchartsalerts.config import Settings
+
+if TYPE_CHECKING:
+    import httpx2
+
+    from stockchartsalerts.config import Settings
 
 logger = logging.getLogger(__name__)
 _EASTERN = ZoneInfo("America/New_York")

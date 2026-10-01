@@ -6,12 +6,15 @@ import asyncio
 import logging
 import os
 import signal
+from typing import TYPE_CHECKING
 
 import httpx2
-import pytest
 
 from stockchartsalerts.__main__ import async_main
 from stockchartsalerts.httpx_client import create_http_client
+
+if TYPE_CHECKING:
+    import pytest
 
 _EXPECTED_MAX_REDIRECTS = 10
 
