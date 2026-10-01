@@ -75,7 +75,8 @@ class App:
             count = await self.poll(self.clock())
         except stockcharts.FetchError as error:
             logger.error("initial alert check failed: %s", str(error))
-        except Exception as error:
+        # Recover from ordinary poll failures without exposing exception details.
+        except Exception as error:  # noqa: BLE001
             logger.error("initial alert check failed; error_type=%s", type(error).__name__)
         else:
             logger.info("initial alert check completed; alerts_sent=%d", count)
@@ -94,7 +95,8 @@ class App:
                     str(error),
                 )
                 next_delay = 300 if consecutive_errors >= 5 else 60
-            except Exception as error:
+            # Recover from ordinary poll failures without exposing exception details.
+            except Exception as error:  # noqa: BLE001
                 consecutive_errors += 1
                 logger.error(
                     "alert check failed; consecutive_errors=%d; error_type=%s",
