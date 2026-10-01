@@ -84,7 +84,7 @@ def test_polling_interval_accepts_integer_text_at_inclusive_bounds(
 @pytest.mark.parametrize("raw_minutes", ["0", "-0", "1441", "", " 5", "5 ", "1_0", "1.5"])
 def test_polling_interval_rejects_invalid_or_padded_integer_text(raw_minutes: str) -> None:
     """Out-of-range, whitespace-padded, or non-integer intervals are rejected."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="MINUTES_BETWEEN_RUNS must"):
         load_settings(
             {
                 "DISCORD_WEBHOOK_URLS": "https://one",

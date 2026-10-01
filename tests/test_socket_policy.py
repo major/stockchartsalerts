@@ -22,7 +22,9 @@ def test_local_loopback_server_connections_are_allowed() -> None:
 
 def test_external_socket_connections_are_blocked_before_connecting() -> None:
     """Block test sockets from connecting to external hosts."""
-    with pytest.warns(UserWarning, match="socket.socket.connect"):
-        with pytest.raises(SocketConnectBlockedError):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
-                client.connect(("203.0.113.1", 80))
+    with (
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client,
+        pytest.raises(SocketConnectBlockedError),
+        pytest.warns(UserWarning, match="socket.socket.connect"),
+    ):
+        client.connect(("203.0.113.1", 80))

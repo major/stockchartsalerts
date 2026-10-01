@@ -144,7 +144,7 @@ def test_stockcharts_timestamp_formats_use_eastern_time(text: str, expected: str
 )
 def test_stockcharts_timestamp_formats_reject_near_matches(text: str) -> None:
     """Near-matches outside StockCharts' supported layouts are rejected."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unsupported StockCharts timestamp"):
         parse_timestamp(text)
 
 
