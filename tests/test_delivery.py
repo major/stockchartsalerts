@@ -33,6 +33,8 @@ def test_delivery_sends_formatted_discord_payload(
     text: str,
     expected_content: str,
 ) -> None:
+    """Send the expected icon and text in the Discord payload."""
+
     async def scenario() -> None:
         payloads: list[dict[str, object]] = []
 
@@ -57,6 +59,8 @@ def test_delivery_sends_formatted_discord_payload(
 
 
 def test_webhooks_are_posted_sequentially_and_failures_do_not_stop_later_urls() -> None:
+    """Attempt configured webhooks sequentially after a failure."""
+
     async def scenario() -> None:
         requests: list[str] = []
         payloads: list[dict[str, object]] = []
@@ -117,6 +121,8 @@ def test_delivery_logs_keep_webhook_secrets_private_at_configured_levels(
     debug_is_visible: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Keep webhook secrets private at each supported logging level."""
+
     async def scenario() -> None:
         request_urls: list[str] = []
         payloads: list[dict[str, object]] = []
@@ -194,6 +200,7 @@ def test_configure_logging_emits_messages_at_normalized_level(
     visible_levels: tuple[str, ...],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Emit messages only at the normalized logging level."""
     caplog.set_level(logging.DEBUG)
     caplog.set_level(logging.DEBUG, logger="httpx2")
     caplog.set_level(logging.DEBUG, logger="httpcore2")
@@ -212,6 +219,8 @@ def test_configure_logging_emits_messages_at_normalized_level(
 def test_webhook_transport_failure_is_sanitized_and_delivery_continues(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Sanitize transport failures and continue to remaining webhooks."""
+
     async def scenario() -> None:
         requests: list[str] = []
 
@@ -248,6 +257,8 @@ def test_webhook_transport_failure_is_sanitized_and_delivery_continues(
 def test_invalid_webhook_url_is_sanitized_and_delivery_continues(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Sanitize invalid webhook URLs and continue delivery."""
+
     async def scenario() -> None:
         requests: list[str] = []
 
@@ -275,6 +286,8 @@ def test_invalid_webhook_url_is_sanitized_and_delivery_continues(
 
 
 def test_unexpected_delivery_error_propagates() -> None:
+    """Propagate unexpected errors without trying later webhook URLs."""
+
     async def scenario() -> None:
         requests: list[str] = []
 
@@ -296,6 +309,8 @@ def test_unexpected_delivery_error_propagates() -> None:
 def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Sanitize body-read timeouts and continue delivery."""
+
     async def scenario() -> None:
         requests: list[str] = []
         body_reads = 0
@@ -365,6 +380,8 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
 
 
 def test_webhook_request_propagates_cancellation() -> None:
+    """Propagate request cancellation without starting later webhook calls."""
+
     async def scenario() -> None:
         started = asyncio.Event()
         requests: list[str] = []

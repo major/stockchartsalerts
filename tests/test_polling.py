@@ -33,6 +33,8 @@ async def _no_wait(_seconds: float) -> None:
 
 
 def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> None:
+    """Preserve the successful poll anchor across an outage and recover."""
+
     async def scenario() -> None:
         webhook_urls = (
             "https://discord.test/webhook/one",
@@ -128,6 +130,8 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
 
 
 def test_poll_rejects_naive_time_without_fetching() -> None:
+    """Reject naive poll times before fetching StockCharts data."""
+
     async def scenario() -> None:
         def unexpected_request(_request: httpx2.Request) -> httpx2.Response:
             raise AssertionError("poll should reject the time before making a request")
@@ -143,6 +147,8 @@ def test_poll_rejects_naive_time_without_fetching() -> None:
 def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Log aggregate rejection counts while delivering valid rows."""
+
     async def scenario() -> None:
         discord_requests: list[httpx2.Request] = []
         rows = [
@@ -233,6 +239,8 @@ def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
 def test_poll_delivers_healthy_alert_after_placeholder_without_rejection_warning(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Ignore placeholder rows without warning when healthy alerts remain."""
+
     async def scenario() -> None:
         discord_requests: list[httpx2.Request] = []
         rows = [
@@ -274,6 +282,8 @@ def test_poll_delivers_healthy_alert_after_placeholder_without_rejection_warning
 def test_poll_counts_non_object_rows_and_delivers_healthy_neighbor(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Count malformed rows and deliver healthy rows from the same feed."""
+
     async def scenario() -> None:
         discord_requests: list[httpx2.Request] = []
         rows: list[object] = [
@@ -360,6 +370,8 @@ def test_initial_lookback_uses_elapsed_time_across_dst(
     rows: list[object],
     expected_alert: bytes,
 ) -> None:
+    """Calculate initial lookback using elapsed time across DST transitions."""
+
     async def scenario() -> None:
         discord_requests: list[httpx2.Request] = []
 
@@ -383,6 +395,8 @@ def test_initial_lookback_uses_elapsed_time_across_dst(
 def test_startup_failure_keeps_interval_and_recurring_errors_back_off(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Keep startup failures out of the recurring backoff count."""
+
     async def scenario() -> None:
         delays: list[float] = []
         events: list[str] = []
@@ -436,6 +450,8 @@ def test_startup_failure_keeps_interval_and_recurring_errors_back_off(
 def test_scheduler_logs_unexpected_exception_types_and_continues(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Log exception types without details and keep the scheduler running."""
+
     async def scenario() -> None:
         clock_calls = 0
         delays: list[float] = []
@@ -488,6 +504,8 @@ def test_scheduler_logs_unexpected_exception_types_and_continues(
 
 
 def test_success_restores_the_regular_interval_after_a_recurring_failure() -> None:
+    """Restore the regular interval after a recurring failure clears."""
+
     async def scenario() -> None:
         delays: list[float] = []
         requests = 0
@@ -523,6 +541,8 @@ def test_success_restores_the_regular_interval_after_a_recurring_failure() -> No
 
 
 def test_cancellation_interrupts_scheduler_wait() -> None:
+    """Propagate cancellation while waiting for the next scheduled poll."""
+
     async def scenario() -> None:
         waiting = asyncio.Event()
 
@@ -552,6 +572,8 @@ def test_cancellation_interrupts_scheduler_wait() -> None:
 
 
 def test_cancellation_interrupts_in_flight_fetch() -> None:
+    """Cancel an in-flight StockCharts fetch during shutdown."""
+
     async def scenario() -> None:
         request_started = asyncio.Event()
 

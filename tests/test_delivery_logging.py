@@ -15,6 +15,7 @@ from stockchartsalerts.discord import send_alert_to_webhooks
 def test_delivery_diagnostics_are_sanitized_and_cover_each_webhook(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Log sanitized diagnostics for each webhook outcome in order."""
     urls = (
         "https://webhook-host.invalid/hooks/success-first?token=secret-one",
         "https://webhook-host.invalid/hooks/status-first?token=secret-two",

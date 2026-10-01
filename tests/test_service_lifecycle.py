@@ -17,6 +17,8 @@ from stockchartsalerts.httpx_client import create_http_client
 def test_invalid_service_configuration_exits_without_logging_secrets_or_creating_a_client(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Reject invalid settings before creating a client or logging secrets."""
+
     def unexpected_client_factory() -> httpx2.AsyncClient:
         raise AssertionError("invalid configuration must not create an HTTP client")
 
@@ -41,6 +43,8 @@ def test_invalid_service_configuration_exits_without_logging_secrets_or_creating
 def test_client_startup_failure_logs_only_the_exception_type(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Report client startup failures without logging exception details."""
+
     def fail_client_factory() -> httpx2.AsyncClient:
         raise RuntimeError("failed for https://discord.test/webhook/token-secret")
 
@@ -66,6 +70,7 @@ def test_client_startup_failure_logs_only_the_exception_type(
 def test_sigterm_cancels_poll_and_closes_the_shared_client(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Cancel polling and close the shared client after SIGTERM."""
     commit = "0123456789abcdef0123456789abcdef01234567"
 
     async def scenario() -> None:
@@ -109,6 +114,8 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
 
 
 def test_shared_client_exposes_the_service_timeout_and_redirect_policy() -> None:
+    """Expose the configured timeout and redirect policy on the shared client."""
+
     async def scenario() -> None:
         async with create_http_client() as client:
             assert client.timeout == httpx2.Timeout(30.0)
