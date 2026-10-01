@@ -54,7 +54,7 @@ class App:
     async def poll(self, now: datetime) -> int:
         """Poll at an aware time and return the number of selected alerts."""
         if now.tzinfo is None or now.utcoffset() is None:
-            raise _NaivePollTimeError()
+            raise _NaivePollTimeError
 
         now = now.astimezone(_EASTERN)
         previous_run = self.last_success
