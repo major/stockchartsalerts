@@ -1,14 +1,17 @@
 """Property checks for alert selection and webhook normalization."""
 
-from collections.abc import Sequence
 from datetime import datetime, timedelta
 from string import ascii_letters, digits
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from hypothesis import given
 from hypothesis import strategies as st
 
 from stockchartsalerts import Alert, load_settings, new_alerts_since
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 _EASTERN = ZoneInfo("America/New_York")
 _ANCHOR = datetime(2024, 8, 1, 12, tzinfo=_EASTERN)

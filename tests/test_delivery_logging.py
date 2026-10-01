@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 import httpx2
-import pytest
 
 from stockchartsalerts.alerts import Alert
 from stockchartsalerts.discord import send_alert_to_webhooks
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_delivery_diagnostics_are_sanitized_and_cover_each_webhook(

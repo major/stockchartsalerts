@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 import httpx2
 import pytest
 
 from stockchartsalerts.stockcharts import DEFAULT_ENDPOINT, FetchError, fetch_alerts
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 _REFERER = "https://stockcharts.com/freecharts/alertsummary.html"
 _USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0"

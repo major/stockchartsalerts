@@ -71,4 +71,4 @@ async def _fetch_once(
     if not isinstance(payload, list):
         raise FetchError("StockCharts response was not a JSON array")
 
-    return cast(list[object], payload)
+    return cast("list[object]", payload)
