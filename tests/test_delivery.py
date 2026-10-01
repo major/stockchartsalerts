@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from datetime import UTC, datetime
 
 import httpx2
@@ -298,16 +299,19 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
     async def scenario() -> None:
         requests: list[str] = []
         body_reads = 0
+        body_read_started = asyncio.Event()
+        body_stream_closed = asyncio.Event()
 
         class HangingBody(httpx2.AsyncByteStream):
             async def __aiter__(self) -> AsyncIterator[bytes]:
                 nonlocal body_reads
                 yield b"pending"
                 body_reads += 1
+                body_read_started.set()
                 await asyncio.Future()
 
             async def aclose(self) -> None:
-                return None
+                body_stream_closed.set()
 
         def handle(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
@@ -326,10 +330,30 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
             "https://discord.test/webhooks/second?token=second-secret",
         ]
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
-            await send_alert_to_webhooks(client, alert, urls, request_timeout=0.0)
+            delivery_task = asyncio.create_task(send_alert_to_webhooks(client, alert, urls, request_timeout=0.0))
+            watchdog = asyncio.timeout(1.0)
+            try:
+                async with watchdog:
+                    await body_read_started.wait()
+                    await asyncio.shield(delivery_task)
+            except TimeoutError:
+                if not watchdog.expired():
+                    raise
+                delivery_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await delivery_task
+                if body_read_started.is_set() and not body_stream_closed.is_set():
+                    raise AssertionError("watchdog cancellation left the response stream open")
+                raise AssertionError("delivery exceeded the test watchdog") from None
+            finally:
+                if not delivery_task.done():
+                    delivery_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await delivery_task
 
         assert requests == ["/webhooks/first", "/webhooks/second"]
         assert body_reads == 1
+        assert body_stream_closed.is_set()
 
     with caplog.at_level(logging.ERROR):
         asyncio.run(scenario())
