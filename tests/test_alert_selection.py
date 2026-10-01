@@ -194,4 +194,4 @@ def test_lookback_selection_requires_a_timezone_aware_anchor() -> None:
     alert = Alert(bearish="no", symbol="A", alert="alert", lastfired="31 Jul 2024, 9:30am")
 
     with pytest.raises(ValueError, match="timezone-aware"):
-        new_alerts_since([alert], datetime(2024, 7, 31, 9, 29))
+        new_alerts_since([alert], datetime.fromisoformat("2024-07-31T09:29"))

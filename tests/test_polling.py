@@ -139,7 +139,7 @@ def test_poll_rejects_naive_time_without_fetching() -> None:
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(unexpected_request)) as client:
             application = App(_settings(), client, sleep=_no_wait)
             with pytest.raises(ValueError, match="timezone-aware"):
-                await application.poll(datetime(2024, 1, 1, 10, 5))
+                await application.poll(datetime.fromisoformat("2024-01-01T10:05"))
 
     asyncio.run(scenario())
 

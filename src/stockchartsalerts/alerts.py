@@ -135,6 +135,7 @@ def _parse_stockcharts_wall_time(text: str) -> datetime:
             int(parts["day"]),
             hour,
             minute,
+            tzinfo=_STOCKCHARTS_TIME_ZONE,
         )
     except ValueError as error:
         raise ValueError(f"unsupported StockCharts timestamp: {text}") from error
@@ -142,17 +143,17 @@ def _parse_stockcharts_wall_time(text: str) -> datetime:
     return wall_time
 
 
-def _localize_stockcharts_wall_time(wall_time: datetime, text: str) -> datetime:
+def _resolve_stockcharts_wall_time(wall_time: datetime, text: str) -> datetime:
     try:
-        parsed = wall_time.replace(tzinfo=_STOCKCHARTS_TIME_ZONE, fold=0)
+        parsed = wall_time.replace(fold=0)
         round_trip = parsed.astimezone(timezone.utc).astimezone(_STOCKCHARTS_TIME_ZONE)
-        if round_trip.replace(tzinfo=None) != wall_time:
+        if round_trip.replace(tzinfo=None) != wall_time.replace(tzinfo=None):
             old_offset = parsed.utcoffset()
-            new_offset = wall_time.replace(tzinfo=_STOCKCHARTS_TIME_ZONE, fold=1).utcoffset()
+            new_offset = wall_time.replace(fold=1).utcoffset()
             if old_offset is not None and new_offset is not None:
                 gap = new_offset - old_offset
                 if gap > timedelta(0):
-                    parsed = (wall_time - gap).replace(tzinfo=_STOCKCHARTS_TIME_ZONE, fold=0)
+                    parsed = (wall_time.replace(tzinfo=None) - gap).replace(tzinfo=_STOCKCHARTS_TIME_ZONE, fold=0)
     except OverflowError as error:
         raise ValueError(f"unsupported StockCharts timestamp: {text}") from error
 
@@ -171,7 +172,7 @@ def parse_timestamp(text: str) -> datetime:
         raise ValueError("unsupported StockCharts timestamp")
 
     wall_time = _parse_stockcharts_wall_time(text)
-    return _localize_stockcharts_wall_time(wall_time, text)
+    return _resolve_stockcharts_wall_time(wall_time, text)
 
 
 def _new_alerts_since(alerts: Sequence[Alert], previous_run: datetime) -> tuple[list[Alert], int]:
