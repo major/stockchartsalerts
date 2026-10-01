@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 _STOCKCHARTS_TIME_ZONE = ZoneInfo("America/New_York")
@@ -161,7 +161,7 @@ def _parse_stockcharts_wall_time(text: str) -> datetime:
 def _resolve_stockcharts_wall_time(wall_time: datetime, text: str) -> datetime:
     try:
         parsed = wall_time.replace(fold=0)
-        round_trip = parsed.astimezone(timezone.utc).astimezone(_STOCKCHARTS_TIME_ZONE)
+        round_trip = parsed.astimezone(UTC).astimezone(_STOCKCHARTS_TIME_ZONE)
         if round_trip.replace(tzinfo=None) != wall_time.replace(tzinfo=None):
             old_offset = parsed.utcoffset()
             new_offset = wall_time.replace(fold=1).utcoffset()
@@ -193,13 +193,13 @@ def parse_timestamp(text: str) -> datetime:
 def _new_alerts_since(alerts: Sequence[Alert], previous_run: datetime) -> tuple[list[Alert], int]:
     if previous_run.tzinfo is None or previous_run.utcoffset() is None:
         raise _NaivePreviousRunError()
-    previous_instant = previous_run.astimezone(timezone.utc)
+    previous_instant = previous_run.astimezone(UTC)
 
     newer: list[tuple[Alert, datetime]] = []
     invalid_timestamps = 0
     for alert in alerts:
         try:
-            fired_at = parse_timestamp(alert.lastfired).astimezone(timezone.utc)
+            fired_at = parse_timestamp(alert.lastfired).astimezone(UTC)
         except ValueError:
             invalid_timestamps += 1
             continue
