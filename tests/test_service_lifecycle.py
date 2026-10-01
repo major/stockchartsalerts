@@ -13,6 +13,8 @@ import pytest
 from stockchartsalerts.__main__ import async_main
 from stockchartsalerts.httpx_client import create_http_client
 
+_EXPECTED_MAX_REDIRECTS = 10
+
 
 def test_invalid_service_configuration_exits_without_logging_secrets_or_creating_a_client(
     caplog: pytest.LogCaptureFixture,
@@ -120,6 +122,6 @@ def test_shared_client_exposes_the_service_timeout_and_redirect_policy() -> None
         async with create_http_client() as client:
             assert client.timeout == httpx2.Timeout(30.0)
             assert client.follow_redirects
-            assert client.max_redirects == 10
+            assert client.max_redirects == _EXPECTED_MAX_REDIRECTS
 
     asyncio.run(scenario())

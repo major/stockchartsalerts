@@ -16,6 +16,7 @@ from stockchartsalerts.config import Settings
 from stockchartsalerts.stockcharts import FetchError
 
 _EASTERN = ZoneInfo("America/New_York")
+_MAX_FETCH_RETRY_DELAY_SECONDS = 4
 
 
 def _settings(*, webhook_urls: tuple[str, ...] = ("https://discord.test/webhook",)) -> Settings:
@@ -42,6 +43,7 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
         )
         settings = _settings(webhook_urls=webhook_urls)
         stockcharts_requests = 0
+        recovery_request_number = 5
         discord_requests: list[httpx2.Request] = []
 
         def handle(request: httpx2.Request) -> httpx2.Response:
@@ -60,9 +62,9 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
                             },
                         ],
                     )
-                if stockcharts_requests < 5:
+                if stockcharts_requests < recovery_request_number:
                     return httpx2.Response(503)
-                if stockcharts_requests == 5:
+                if stockcharts_requests == recovery_request_number:
                     return httpx2.Response(
                         200,
                         json=[
@@ -210,7 +212,8 @@ def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
 
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             application = App(_settings(), client, sleep=_no_wait)
-            assert await application.poll(datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)) == 3
+            expected_selected_alert_count = 3
+            assert await application.poll(datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)) == expected_selected_alert_count
 
         assert [json.loads(request.content)["content"] for request in discord_requests] == [
             "💚  Healthy neighbor",
@@ -406,11 +409,13 @@ def test_startup_failure_keeps_interval_and_recurring_errors_back_off(
             events.append("fetch")
             return httpx2.Response(503, text="upstream-private-response")
 
+        scheduled_waits_before_cancel = 6
+
         async def controlled_sleep(seconds: float) -> None:
-            if seconds > 4:
+            if seconds > _MAX_FETCH_RETRY_DELAY_SECONDS:
                 delays.append(seconds)
                 events.append(f"scheduled-wait:{seconds:g}")
-                if len(delays) == 6:
+                if len(delays) == scheduled_waits_before_cancel:
                     raise asyncio.CancelledError
 
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
@@ -454,6 +459,8 @@ def test_scheduler_logs_unexpected_exception_types_and_continues(
 
     async def scenario() -> None:
         clock_calls = 0
+        clock_call_that_returns_time = 2
+        waits_before_cancel = 3
         delays: list[float] = []
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
 
@@ -462,7 +469,7 @@ def test_scheduler_logs_unexpected_exception_types_and_continues(
             clock_calls += 1
             if clock_calls == 1:
                 raise RuntimeError("startup-private-detail")
-            if clock_calls == 2:
+            if clock_calls == clock_call_that_returns_time:
                 return now
             raise ValueError("recurring-private-detail")
 
@@ -472,7 +479,7 @@ def test_scheduler_logs_unexpected_exception_types_and_continues(
 
         async def controlled_sleep(seconds: float) -> None:
             delays.append(seconds)
-            if len(delays) == 3:
+            if len(delays) == waits_before_cancel:
                 raise asyncio.CancelledError
 
         with caplog.at_level(logging.ERROR, logger="stockchartsalerts.app"):
@@ -509,19 +516,21 @@ def test_success_restores_the_regular_interval_after_a_recurring_failure() -> No
     async def scenario() -> None:
         delays: list[float] = []
         requests = 0
+        failed_requests_before_success = 6
+        waits_before_cancel = 3
 
         def fail_startup_and_first_recurring_poll(request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             assert request.url.host == "stockcharts.com"
             requests += 1
-            if requests <= 6:
+            if requests <= failed_requests_before_success:
                 return httpx2.Response(503)
             return httpx2.Response(200, json=[])
 
         async def controlled_sleep(seconds: float) -> None:
-            if seconds > 4:
+            if seconds > _MAX_FETCH_RETRY_DELAY_SECONDS:
                 delays.append(seconds)
-                if len(delays) == 3:
+                if len(delays) == waits_before_cancel:
                     raise asyncio.CancelledError
 
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)

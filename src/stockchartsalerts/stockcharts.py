@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from http import HTTPStatus
 from typing import cast
 
 import httpx2
@@ -59,7 +60,7 @@ async def _fetch_once(
     except httpx2.HTTPError, TimeoutError, ValueError:
         raise FetchError("StockCharts request failed") from None
 
-    if not 200 <= response.status_code < 300:
+    if not HTTPStatus.OK <= response.status_code < HTTPStatus.MULTIPLE_CHOICES:
         raise FetchError(f"StockCharts returned HTTP status {response.status_code}")
 
     try:

@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 
 _STOCKCHARTS_TIME_ZONE = ZoneInfo("America/New_York")
 _NO_ALERTS_PLACEHOLDER = "There are no alerts today"
+_MAX_TIMESTAMP_HOUR = 12
+_MAX_TIMESTAMP_MINUTE = 59
 _MONTHS = {
     "jan": 1,
     "feb": 2,
@@ -124,7 +126,7 @@ def _parse_stockcharts_wall_time(text: str) -> datetime:
 
     hour = int(parts["hour"])
     minute = int(parts["minute"])
-    if not 0 <= hour <= 12 or minute > 59:
+    if not 0 <= hour <= _MAX_TIMESTAMP_HOUR or minute > _MAX_TIMESTAMP_MINUTE:
         raise ValueError(f"unsupported StockCharts timestamp: {text}")
 
     hour = hour % 12 + (12 if parts["period"].lower() == "pm" else 0)

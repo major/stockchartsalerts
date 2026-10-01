@@ -12,12 +12,13 @@ from stockchartsalerts import Alert, load_settings, new_alerts_since
 
 _EASTERN = ZoneInfo("America/New_York")
 _ANCHOR = datetime(2024, 8, 1, 12, tzinfo=_EASTERN)
+_HOURS_PER_HALF_DAY = 12
 
 
 def _format_minutes_after_anchor(minutes: int) -> str:
     fired_at = _ANCHOR + timedelta(minutes=minutes)
-    hour = fired_at.hour % 12 or 12
-    period = "am" if fired_at.hour < 12 else "pm"
+    hour = fired_at.hour % _HOURS_PER_HALF_DAY or _HOURS_PER_HALF_DAY
+    period = "am" if fired_at.hour < _HOURS_PER_HALF_DAY else "pm"
     return f"{fired_at.day} Aug 2024, {hour}:{fired_at.minute:02}{period}"
 
 
