@@ -1,24 +1,24 @@
-FROM docker.io/library/golang:1.27.1-bookworm@sha256:69a7b9788769bec032d238959b61854e9ae87f57be9029ec04e9885fabf99195 AS builder
+FROM registry.access.redhat.com/ubi9/python-314:latest@sha256:28f564643c2fe7d4607562f1f4057f162654316f9226530a34925a792edf2263 AS builder
 
-WORKDIR /app
+WORKDIR /opt/app-root/src
 
-COPY go.mod go.sum ./
-COPY cmd ./cmd
-COPY internal ./internal
+COPY pyproject.toml uv.lock .python-version ./
+COPY src ./src
 
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/stockchartsalerts ./cmd/stockchartsalerts
+RUN python3 -m pip install --no-cache-dir uv==0.12.18 \
+    && uv sync --locked --no-dev --no-editable --python python3.14
 
-FROM registry.access.redhat.com/hi/core-runtime:latest@sha256:b9e0bf16ff3afe7f1a45451128a091af54065baaff80aec27ac18de7aca27253
+FROM registry.access.redhat.com/ubi9/python-314:latest@sha256:28f564643c2fe7d4607562f1f4057f162654316f9226530a34925a792edf2263
 
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_BRANCH=${GIT_BRANCH}
 
-# Copy CA certificates from builder for TLS verification
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+WORKDIR /opt/app-root/src
 
-# Copy the compiled binary
-COPY --from=builder /out/stockchartsalerts /usr/local/bin/stockchartsalerts
+COPY --from=builder --chown=1001:0 /opt/app-root/src/.venv /opt/app-root/src/.venv
 
-ENTRYPOINT ["/usr/local/bin/stockchartsalerts"]
+ENV PATH="/opt/app-root/src/.venv/bin:${PATH}"
+
+ENTRYPOINT ["/opt/app-root/src/.venv/bin/stockchartsalerts"]
