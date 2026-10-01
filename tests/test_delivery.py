@@ -343,7 +343,7 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
                 with suppress(asyncio.CancelledError):
                     await delivery_task
                 if body_read_started.is_set() and not body_stream_closed.is_set():
-                    raise AssertionError("watchdog cancellation left the response stream open")
+                    raise AssertionError("watchdog cancellation left the response stream open") from None
                 raise AssertionError("delivery exceeded the test watchdog") from None
             finally:
                 if not delivery_task.done():
