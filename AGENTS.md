@@ -91,6 +91,9 @@ The coverage target is the single test run in `make all`. The individual
 Makefile targets are `fmt`, `lint`, `types`, `test`, `coverage`, and `build`.
 `make audit` runs `pip-audit`.
 `make mutate` runs the optional mutmut campaign and is not part of `make all`.
+`.github/workflows/mutation.yml` runs weekly on Sunday at 06:23 UTC and supports
+manual dispatch only. Its schedule starts after merge to the default branch; it
+does not run on pull requests or gate merges.
 
 ## Documentation Maintenance
 

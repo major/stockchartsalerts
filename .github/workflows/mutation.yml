@@ -1,0 +1,106 @@
+name: Mutation tests
+
+on:
+  schedule:
+    - cron: "23 6 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: mutmut-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    name: Scoped mutation campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install uv and sync locked environment
+        run: |
+          python3 -m pip install --user --disable-pip-version-check "uv==0.12.18"
+          user_base="$(python3 -m site --user-base)"
+          echo "$user_base/bin" >> "$GITHUB_PATH"
+          PATH="$user_base/bin:$PATH"
+          export PATH
+          uv python install
+          uv sync --locked
+
+      - name: Run mutmut
+        id: mutate
+        timeout-minutes: 14
+        run: |
+          set -o pipefail
+          mkdir -p reports
+          uv run --locked --no-sync mutmut run --max-children 2 2>&1 | tee reports/mutmut-run.log
+
+      - name: Collect mutation report
+        if: ${{ always() }}
+        env:
+          MUTATION_OUTCOME: ${{ steps.mutate.outcome }}
+        run: |
+          mkdir -p reports
+          printf 'Mutmut step outcome: %s\n' "${MUTATION_OUTCOME:-unknown}" > reports/mutmut-outcome.txt
+          {
+            echo "## Mutmut scheduled report"
+            printf '\n- Mutmut step outcome: %s\n' "${MUTATION_OUTCOME:-unknown}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ ! -d mutants ]; then
+            printf 'Mutmut did not initialize mutants/.\n' > reports/mutmut-results.txt
+            echo '- No mutation result directory was created.' >> "$GITHUB_STEP_SUMMARY"
+            if [ "${MUTATION_OUTCOME:-}" = "success" ]; then
+              echo "mutmut exited successfully without initializing its result directory" >&2
+              exit 1
+            fi
+            exit 0
+          fi
+
+          uv run --locked --no-sync mutmut results > reports/mutmut-results.txt
+          uv run --locked --no-sync mutmut export-cicd-stats > reports/mutmut-export.log 2>&1
+
+          if [ ! -f mutants/mutmut-cicd-stats.json ]; then
+            printf 'Mutmut produced no completed-result statistics.\n' > reports/mutmut-results.txt
+            echo '- No mutation statistics were available.' >> "$GITHUB_STEP_SUMMARY"
+            if [ "${MUTATION_OUTCOME:-}" = "success" ]; then
+              echo "mutmut exited successfully without exporting mutation statistics" >&2
+              exit 1
+            fi
+            exit 0
+          fi
+
+          cp mutants/mutmut-cicd-stats.json reports/mutmut-cicd-stats.json
+          stats_line="$(jq -r '[.killed, .survived, .timeout, .no_tests, .total] | @tsv' reports/mutmut-cicd-stats.json)"
+          IFS=$'\t' read -r killed survived timeouts no_tests total <<< "$stats_line"
+          printf -- '- Mutants: %s killed, %s survived, %s timed out, %s with no tests, out of %s.\n' \
+            "$killed" "$survived" "$timeouts" "$no_tests" "$total" >> "$GITHUB_STEP_SUMMARY"
+
+          # mutmut 3.8 can return success after an interrupted run. Its export
+          # counts untested mutants in total but omits a not_checked field.
+          if ! jq -e '
+            .total == ([.killed, .survived, .no_tests, .skipped, .suspicious, .timeout, .check_was_interrupted_by_user, .segfault] | add)
+            and .check_was_interrupted_by_user == 0
+            and .suspicious == 0
+          ' reports/mutmut-cicd-stats.json > /dev/null; then
+            printf 'Mutmut exported incomplete or suspicious results.\n' >> "$GITHUB_STEP_SUMMARY"
+            if [ "${MUTATION_OUTCOME:-}" = "success" ]; then
+              echo "mutmut exited successfully with unclassified mutants" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Upload mutation report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutmut-report-${{ github.run_id }}
+          path: reports/
+          if-no-files-found: error
+          retention-days: 30

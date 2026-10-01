@@ -65,6 +65,15 @@ Mutants that survive may be equivalent or unreachable, not necessarily evidence
 of a missing test. Check the behavior and assertions before changing tests.
 Mutation testing is not part of `make all`; Hypothesis and mutmut keep generated
 files in ignored local directories.
+
+GitHub Actions runs the scoped mutation campaign each Sunday at 06:23 UTC and
+supports manual `workflow_dispatch`. Scheduled runs use the workflow on the
+default branch, so weekly reports begin after this change is merged there. The
+workflow has no pull request trigger and does not gate merges. Each run is
+time-bounded and uploads its log, result list, and mutmut statistics as an
+artifact retained for 30 days. An incomplete run is marked failed; survivor
+counts do not have a score threshold.
+
 The dependency audit is separate:
 
 ```bash
