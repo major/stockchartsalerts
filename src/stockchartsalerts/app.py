@@ -23,6 +23,11 @@ Clock = Callable[[], datetime]
 Sleep = Callable[[float], Awaitable[None]]
 
 
+class _NaivePollTimeError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("poll time must be timezone-aware")
+
+
 def _eastern_now() -> datetime:
     return datetime.now(_EASTERN)
 
@@ -49,7 +54,7 @@ class App:
     async def poll(self, now: datetime) -> int:
         """Poll at an aware time and return the number of selected alerts."""
         if now.tzinfo is None or now.utcoffset() is None:
-            raise ValueError("poll time must be timezone-aware")
+            raise _NaivePollTimeError()
 
         now = now.astimezone(_EASTERN)
         previous_run = self.last_success
@@ -79,10 +84,11 @@ class App:
         try:
             count = await self.poll(self.clock())
         except stockcharts.FetchError as error:
-            logger.error("initial alert check failed: %s", str(error))
+            # Keep the sanitized fetch message without a traceback.
+            logger.error("initial alert check failed: %s", str(error))  # noqa: TRY400
         # Recover from ordinary poll failures without exposing exception details.
         except Exception as error:  # noqa: BLE001
-            logger.error("initial alert check failed; error_type=%s", type(error).__name__)
+            logger.error("initial alert check failed; error_type=%s", type(error).__name__)  # noqa: TRY400
         else:
             logger.info("initial alert check completed; alerts_sent=%d", count)
 
@@ -94,7 +100,8 @@ class App:
                 count = await self.poll(self.clock())
             except stockcharts.FetchError as error:
                 consecutive_errors += 1
-                logger.error(
+                # Keep the sanitized fetch message without a traceback.
+                logger.error(  # noqa: TRY400
                     "alert check failed; consecutive_errors=%d; error=%s",
                     consecutive_errors,
                     str(error),
@@ -103,7 +110,7 @@ class App:
             # Recover from ordinary poll failures without exposing exception details.
             except Exception as error:  # noqa: BLE001
                 consecutive_errors += 1
-                logger.error(
+                logger.error(  # noqa: TRY400
                     "alert check failed; consecutive_errors=%d; error_type=%s",
                     consecutive_errors,
                     type(error).__name__,

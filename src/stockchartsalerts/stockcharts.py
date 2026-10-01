@@ -25,6 +25,31 @@ class FetchError(Exception):
     """A sanitized error raised when StockCharts data cannot be fetched."""
 
 
+class _RequestFailedError(FetchError):
+    def __init__(self) -> None:
+        super().__init__("StockCharts request failed")
+
+
+class _HttpStatusError(FetchError):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"StockCharts returned HTTP status {status_code}")
+
+
+class _InvalidJsonError(FetchError):
+    def __init__(self) -> None:
+        super().__init__("StockCharts response was not valid JSON")
+
+
+class _NonArrayResponseError(FetchError):
+    def __init__(self) -> None:
+        super().__init__("StockCharts response was not a JSON array")
+
+
+class _UnreachableRetryStateError(AssertionError):
+    def __init__(self) -> None:
+        super().__init__("unreachable retry state")
+
+
 async def fetch_alerts(
     client: httpx2.AsyncClient,
     *,
@@ -43,7 +68,7 @@ async def fetch_alerts(
             logger.warning("StockCharts fetch failed; %s; retrying attempt=%d", error, attempt + 1)
             await sleep(_RETRY_DELAYS[attempt])
 
-    raise AssertionError("unreachable retry state")
+    raise _UnreachableRetryStateError()
 
 
 async def _fetch_once(
@@ -58,17 +83,17 @@ async def _fetch_once(
                 headers={"Referer": _REFERER, "User-Agent": _USER_AGENT},
             )
     except httpx2.HTTPError, TimeoutError, ValueError:
-        raise FetchError("StockCharts request failed") from None
+        raise _RequestFailedError from None
 
     if not HTTPStatus.OK <= response.status_code < HTTPStatus.MULTIPLE_CHOICES:
-        raise FetchError(f"StockCharts returned HTTP status {response.status_code}")
+        raise _HttpStatusError(response.status_code)
 
     try:
         payload = response.json()
     except ValueError:
-        raise FetchError("StockCharts response was not valid JSON") from None
+        raise _InvalidJsonError from None
 
     if not isinstance(payload, list):
-        raise FetchError("StockCharts response was not a JSON array")
+        raise _NonArrayResponseError
 
     return cast("list[object]", payload)

@@ -48,7 +48,8 @@ def test_delivery_diagnostics_are_sanitized_and_cover_each_webhook(
             try:
                 await asyncio.sleep(0)
                 if request.url.path in transport_failures:
-                    raise httpx2.ConnectError(
+                    # Keep a real transport error with private text for the redaction check.
+                    raise httpx2.ConnectError(  # noqa: TRY003
                         "upstream failed with private transport detail",
                         request=request,
                     )

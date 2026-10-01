@@ -136,7 +136,7 @@ def test_poll_rejects_naive_time_without_fetching() -> None:
 
     async def scenario() -> None:
         def unexpected_request(_request: httpx2.Request) -> httpx2.Response:
-            raise AssertionError("poll should reject the time before making a request")
+            pytest.fail("poll should reject the time before making a request", pytrace=False)
 
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(unexpected_request)) as client:
             application = App(_settings(), client, sleep=_no_wait)

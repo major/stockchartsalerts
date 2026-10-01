@@ -37,6 +37,19 @@ _UPPERCASE_TIMESTAMP = re.compile(
 _ALERT_FIELDS = frozenset({"alert", "bearish", "lastfired", "symbol"})
 
 
+class _UnsupportedTimestampError(ValueError):
+    def __init__(self, text: str | None = None) -> None:
+        message = "unsupported StockCharts timestamp"
+        if text is not None:
+            message = f"{message}: {text}"
+        super().__init__(message)
+
+
+class _NaivePreviousRunError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("previous_run must be timezone-aware")
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Alert:
     """A normalized StockCharts alert row."""
@@ -117,17 +130,17 @@ def _parse_stockcharts_wall_time(text: str) -> datetime:
     if match is None:
         match = _UPPERCASE_TIMESTAMP.fullmatch(cleaned)
     if match is None:
-        raise ValueError(f"unsupported StockCharts timestamp: {text}")
+        raise _UnsupportedTimestampError(text)
 
     parts = match.groupdict()
     month = _MONTHS.get(parts["month"].lower())
     if month is None:
-        raise ValueError(f"unsupported StockCharts timestamp: {text}")
+        raise _UnsupportedTimestampError(text)
 
     hour = int(parts["hour"])
     minute = int(parts["minute"])
     if not 0 <= hour <= _MAX_TIMESTAMP_HOUR or minute > _MAX_TIMESTAMP_MINUTE:
-        raise ValueError(f"unsupported StockCharts timestamp: {text}")
+        raise _UnsupportedTimestampError(text)
 
     hour = hour % 12 + (12 if parts["period"].lower() == "pm" else 0)
     try:
@@ -140,7 +153,7 @@ def _parse_stockcharts_wall_time(text: str) -> datetime:
             tzinfo=_STOCKCHARTS_TIME_ZONE,
         )
     except ValueError as error:
-        raise ValueError(f"unsupported StockCharts timestamp: {text}") from error
+        raise _UnsupportedTimestampError(text) from error
 
     return wall_time
 
@@ -157,7 +170,7 @@ def _resolve_stockcharts_wall_time(wall_time: datetime, text: str) -> datetime:
                 if gap > timedelta(0):
                     parsed = (wall_time.replace(tzinfo=None) - gap).replace(tzinfo=_STOCKCHARTS_TIME_ZONE, fold=0)
     except OverflowError as error:
-        raise ValueError(f"unsupported StockCharts timestamp: {text}") from error
+        raise _UnsupportedTimestampError(text) from error
 
     return parsed
 
@@ -171,7 +184,7 @@ def parse_timestamp(text: str) -> datetime:
     nonexistent spring-forward times follow Go's backward normalization.
     """
     if not isinstance(text, str):
-        raise ValueError("unsupported StockCharts timestamp")
+        raise _UnsupportedTimestampError()
 
     wall_time = _parse_stockcharts_wall_time(text)
     return _resolve_stockcharts_wall_time(wall_time, text)
@@ -179,7 +192,7 @@ def parse_timestamp(text: str) -> datetime:
 
 def _new_alerts_since(alerts: Sequence[Alert], previous_run: datetime) -> tuple[list[Alert], int]:
     if previous_run.tzinfo is None or previous_run.utcoffset() is None:
-        raise ValueError("previous_run must be timezone-aware")
+        raise _NaivePreviousRunError()
     previous_instant = previous_run.astimezone(timezone.utc)
 
     newer: list[tuple[Alert, datetime]] = []
