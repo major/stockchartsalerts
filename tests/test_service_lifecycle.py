@@ -6,15 +6,12 @@ import asyncio
 import logging
 import os
 import signal
-from typing import TYPE_CHECKING
 
 import httpx2
+import pytest
 
 from stockchartsalerts.__main__ import async_main
 from stockchartsalerts.httpx_client import create_http_client
-
-if TYPE_CHECKING:
-    import pytest
 
 _EXPECTED_MAX_REDIRECTS = 10
 
@@ -25,7 +22,7 @@ def test_invalid_service_configuration_exits_without_logging_secrets_or_creating
     """Reject invalid settings before creating a client or logging secrets."""
 
     def unexpected_client_factory() -> httpx2.AsyncClient:
-        raise AssertionError("invalid configuration must not create an HTTP client")
+        pytest.fail("invalid configuration must not create an HTTP client", pytrace=False)
 
     caplog.set_level(logging.DEBUG, logger="httpx2")
     caplog.set_level(logging.DEBUG, logger="httpcore2")
@@ -51,7 +48,8 @@ def test_client_startup_failure_logs_only_the_exception_type(
     """Report client startup failures without logging exception details."""
 
     def fail_client_factory() -> httpx2.AsyncClient:
-        raise RuntimeError("failed for https://discord.test/webhook/token-secret")
+        # Preserve the ordinary RuntimeError type and secret-bearing message for the redaction check.
+        raise RuntimeError("failed for https://discord.test/webhook/token-secret")  # noqa: TRY003
 
     caplog.set_level(logging.DEBUG, logger="httpx2")
     caplog.set_level(logging.DEBUG, logger="httpcore2")

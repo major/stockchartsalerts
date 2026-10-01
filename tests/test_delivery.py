@@ -230,7 +230,8 @@ def test_webhook_transport_failure_is_sanitized_and_delivery_continues(
         def fail_first(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
             if request.url.path.endswith("first"):
-                raise httpx2.ConnectError("first-secret leaked by transport", request=request)
+                # This private detail must remain in the real transport exception for the redaction check.
+                raise httpx2.ConnectError("first-secret leaked by transport", request=request)  # noqa: TRY003
             return httpx2.Response(200)
 
         alert = Alert(
@@ -296,7 +297,8 @@ def test_unexpected_delivery_error_propagates() -> None:
 
         def fail_unexpectedly(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
-            raise RuntimeError("unexpected programming failure")
+            # Preserve the ordinary RuntimeError type and message for this propagation test.
+            raise RuntimeError("unexpected programming failure")  # noqa: TRY003
 
         alert = Alert(bearish="no", symbol="SPX", alert="Alert", lastfired="")
         urls = ["https://discord.test/webhooks/first", "https://discord.test/webhooks/second"]
@@ -361,8 +363,8 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
                 with suppress(asyncio.CancelledError):
                     await delivery_task
                 if body_read_started.is_set() and not body_stream_closed.is_set():
-                    raise AssertionError("watchdog cancellation left the response stream open") from None
-                raise AssertionError("delivery exceeded the test watchdog") from None
+                    pytest.fail("watchdog cancellation left the response stream open", pytrace=False)
+                pytest.fail("delivery exceeded the test watchdog", pytrace=False)
             finally:
                 if not delivery_task.done():
                     delivery_task.cancel()

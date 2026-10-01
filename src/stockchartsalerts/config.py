@@ -14,6 +14,21 @@ _LOG_LEVELS = frozenset({"debug", "info", "warn", "error"})
 _MAX_MINUTES_BETWEEN_RUNS = 1440
 
 
+class _InvalidPollingIntervalError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("MINUTES_BETWEEN_RUNS must be a valid integer")
+
+
+class _PollingIntervalOutOfRangeError(ValueError):
+    def __init__(self) -> None:
+        super().__init__(f"MINUTES_BETWEEN_RUNS must be between 1 and {_MAX_MINUTES_BETWEEN_RUNS}")
+
+
+class _InvalidWebhookUrlsError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("at least one Discord webhook URL must be provided via DISCORD_WEBHOOK_URLS")
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Settings:
     """Validated runtime settings supplied to the application."""
@@ -30,17 +45,17 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     if "MINUTES_BETWEEN_RUNS" in env:
         raw_minutes = env["MINUTES_BETWEEN_RUNS"]
         if not isinstance(raw_minutes, str) or _INTEGER.fullmatch(raw_minutes) is None:
-            raise ValueError("MINUTES_BETWEEN_RUNS must be a valid integer")
+            raise _InvalidPollingIntervalError()
         minutes_between_runs = int(raw_minutes)
     else:
         minutes_between_runs = 5
 
     if not 1 <= minutes_between_runs <= _MAX_MINUTES_BETWEEN_RUNS:
-        raise ValueError(f"MINUTES_BETWEEN_RUNS must be between 1 and {_MAX_MINUTES_BETWEEN_RUNS}")
+        raise _PollingIntervalOutOfRangeError()
 
     raw_webhook_urls = env.get("DISCORD_WEBHOOK_URLS", "")
     if not isinstance(raw_webhook_urls, str):
-        raise ValueError("at least one Discord webhook URL must be provided via DISCORD_WEBHOOK_URLS")
+        raise _InvalidWebhookUrlsError()
 
     webhook_urls: list[str] = []
     seen: set[str] = set()
@@ -50,7 +65,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
             seen.add(normalized_url)
             webhook_urls.append(normalized_url)
     if not webhook_urls:
-        raise ValueError("at least one Discord webhook URL must be provided via DISCORD_WEBHOOK_URLS")
+        raise _InvalidWebhookUrlsError()
 
     git_commit = env.get("GIT_COMMIT", "unknown").strip() or "unknown"
     git_branch = env.get("GIT_BRANCH", "unknown").strip() or "unknown"

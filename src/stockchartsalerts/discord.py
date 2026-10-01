@@ -50,7 +50,8 @@ async def send_alert_to_webhooks(
             async with asyncio.timeout(request_timeout):
                 response = await client.post(url, json=payload)
         except (httpx2.HTTPError, httpx2.InvalidURL, TimeoutError, ValueError) as error:
-            logger.error(
+            # Request errors may contain webhook URLs or credentials; omit tracebacks.
+            logger.error(  # noqa: TRY400
                 "Discord webhook failed; webhook=%d/%d error=%s symbol=%s",
                 index,
                 total,

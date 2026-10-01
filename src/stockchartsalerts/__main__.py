@@ -47,7 +47,7 @@ async def async_main(
         except ValueError:
             # Configuration errors can contain webhook values, so do not log
             # their exception text.
-            logger.error("failed to load configuration")
+            logger.error("failed to load configuration")  # noqa: TRY400
             return 1
 
         configure_logging(settings.log_level)
@@ -67,7 +67,8 @@ async def async_main(
         # Integration errors are sanitized at their boundaries. Avoid logging
         # arbitrary exception details here in case a third-party error includes
         # a configured URL.
-        logger.error("application failed; error=%s", type(error).__name__)
+        # Do not attach a traceback that could expose the underlying exception.
+        logger.error("application failed; error=%s", type(error).__name__)  # noqa: TRY400
         return 1
     finally:
         for signum in registered_signals:

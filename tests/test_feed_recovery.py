@@ -127,7 +127,8 @@ def test_fetch_alerts_sanitizes_transport_errors_and_retries(caplog: pytest.LogC
         def fail_with_secret(request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             requests += 1
-            raise httpx2.ConnectError("secret transport details", request=request)
+            # Keep a real transport exception with private text for the redaction check.
+            raise httpx2.ConnectError("secret transport details", request=request)  # noqa: TRY003
 
         async def record_sleep(seconds: float) -> None:
             delays.append(seconds)
