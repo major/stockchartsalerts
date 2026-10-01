@@ -26,11 +26,11 @@ _MONTHS = {
 }
 _LOWERCASE_TIMESTAMP = re.compile(
     r"(?P<day>[0-9]{1,2}) +(?P<month>[A-Za-z]{3}) +(?P<year>[0-9]{4}), +"
-    r"(?P<hour>[0-9]{1,2}):(?P<minute>[0-9]{2})(?P<period>am|pm)"
+    r"(?P<hour>[0-9]{1,2}):(?P<minute>[0-9]{2})(?P<period>am|pm)",
 )
 _UPPERCASE_TIMESTAMP = re.compile(
     r"(?P<day>[0-9]{1,2}) +(?P<month>[A-Za-z]{3}) +(?P<year>[0-9]{4}), +"
-    r"(?P<hour>[0-9]{1,2}):(?P<minute>[0-9]{2}) +(?P<period>AM|PM)"
+    r"(?P<hour>[0-9]{1,2}):(?P<minute>[0-9]{2}) +(?P<period>AM|PM)",
 )
 _ALERT_FIELDS = frozenset({"alert", "bearish", "lastfired", "symbol"})
 
@@ -94,7 +94,7 @@ def _filter_alerts(rows: Sequence[object]) -> tuple[list[Alert], int]:
                 symbol=normalized["symbol"],
                 alert=normalized["alert"],
                 lastfired=normalized["lastfired"],
-            )
+            ),
         )
 
     return result, malformed_rows

@@ -50,7 +50,7 @@ def test_delivery_sends_formatted_discord_payload(
                 "username": "$INDU",
                 "avatar_url": "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
                 "content": expected_content,
-            }
+            },
         ]
 
     asyncio.run(scenario())
@@ -100,7 +100,7 @@ def test_webhooks_are_posted_sequentially_and_failures_do_not_stop_later_urls() 
                     "username": "$COMPQ",
                     "avatar_url": "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
                     "content": "💚  Test alert",
-                }
+                },
             ]
             * 3
         )
@@ -132,7 +132,7 @@ def test_delivery_logs_keep_webhook_secrets_private_at_configured_levels(
                             "bearish": "no",
                             "lastfired": "1 Jan 2024, 10:04am",
                             "symbol": "TEST",
-                        }
+                        },
                     ],
                 )
             payloads.append(json.loads(request.content))
@@ -158,7 +158,7 @@ def test_delivery_logs_keep_webhook_secrets_private_at_configured_levels(
                 "username": "TEST",
                 "avatar_url": "https://emojiguide.org/images/emoji/1/8z8e40kucdd1.png",
                 "content": "💚  Test alert",
-            }
+            },
         ]
 
     caplog.set_level(logging.DEBUG)
