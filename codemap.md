@@ -25,8 +25,8 @@ with bounded fetch retries and scheduler backoff.
 2. `app` creates one shared asynchronous `httpx` client, performs one startup
    check, then schedules recurring checks and responds to SIGINT or SIGTERM.
 3. `stockcharts` fetches and decodes the StockCharts response with bounded
-   retries. `alerts` normalizes rows, parses timestamps in `America/New_York`,
-   and filters malformed or placeholder rows.
+   retries. `alerts` normalizes and selects rows, parses timestamps in
+   `America/New_York`, and counts malformed rows and invalid timestamps.
 4. `alerts` keeps only rows strictly newer than the lookback anchor and the
    latest timestamp or tied timestamps for each case-sensitive symbol.
 5. `discord` builds the fixed webhook payload and posts sequentially to every
@@ -46,9 +46,9 @@ with bounded fetch retries and scheduler backoff.
 | Module | Responsibility |
 | --- | --- |
 | `__main__.py` | Console entry point and process startup. |
-| `app.py` | Polling, shared async client lifecycle, in-memory lookback state, scheduler, backoff, and graceful cancellation. |
+| `app.py` | Polling, aggregate rejection warnings, shared async client lifecycle, in-memory lookback state, scheduler, backoff, and graceful cancellation. |
 | `config.py` | Environment parsing, normalization, defaults, and validation. |
-| `alerts.py` | Alert row defaults, filtering, timestamp parsing, and latest-per-symbol selection. |
+| `alerts.py` | Alert row defaults, filtering, timestamp parsing, latest-per-symbol selection, and aggregate rejection counts. |
 | `stockcharts.py` | StockCharts HTTP request, response decoding, and fetch retries. |
 | `discord.py` | Discord payload formatting and sequential best-effort delivery. |
 | `httpx_client.py` | Shared async HTTP client defaults and response status checks. |
@@ -64,5 +64,7 @@ with bounded fetch retries and scheduler backoff.
 - SIGINT and SIGTERM cancel the async polling work and allow client cleanup.
 - StockCharts fetch failures and individual Discord delivery failures are
   handled without crashing the service where possible.
+- Rejected feed rows produce one aggregate warning per poll with counts only,
+  without logging row values, symbols, timestamps, or exception details.
 - Polling progress is in memory only. There is no durable watermark, Discord
   retry, or guaranteed delivery.

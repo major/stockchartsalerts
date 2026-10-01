@@ -97,6 +97,12 @@ def test_stockcharts_timestamp_formats_reject_near_matches(text: str) -> None:
         parse_timestamp(text)
 
 
+def test_stockcharts_timestamp_rejects_unrepresentable_utc_conversion() -> None:
+    """Eastern timestamps that overflow when converted to UTC raise ValueError."""
+    with pytest.raises(ValueError, match="unsupported StockCharts timestamp"):
+        parse_timestamp("31 Dec 9999, 11:59pm")
+
+
 def test_lookback_selection_keeps_latest_alerts_and_all_timestamp_ties() -> None:
     """Emit only strictly newer rows at each symbol's latest timestamp."""
     alerts = [
