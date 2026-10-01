@@ -84,7 +84,7 @@ def _expected_webhooks(entries: Sequence[str]) -> tuple[str, ...]:
     entries=st.lists(
         st.text(alphabet=ascii_letters + digits + ":/_- ", max_size=12),
         max_size=30,
-    )
+    ),
 )
 def test_webhook_configuration_normalizes_generated_entries(entries: list[str]) -> None:
     """Trim webhook values, drop blanks, and keep each first occurrence."""

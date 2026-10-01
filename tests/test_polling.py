@@ -55,7 +55,7 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
                                 "bearish": "no",
                                 "lastfired": "1 Jan 2024, 10:02am",
                                 "symbol": "FIRST",
-                            }
+                            },
                         ],
                     )
                 if stockcharts_requests < 5:
@@ -69,7 +69,7 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
                                 "bearish": "yes",
                                 "lastfired": "1 Jan 2024, 10:10am",
                                 "symbol": "LATER",
-                            }
+                            },
                         ],
                     )
                 return httpx2.Response(
@@ -80,7 +80,7 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
                             "bearish": "no",
                             "lastfired": "1 Jan 2024, 10:20am",
                             "symbol": "STALE",
-                        }
+                        },
                     ],
                 )
 
@@ -258,7 +258,7 @@ def test_poll_delivers_healthy_alert_after_placeholder_without_rejection_warning
             assert await application.poll(datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)) == 1
 
         assert [json.loads(request.content)["content"] for request in discord_requests] == [
-            "💚  Healthy alert after placeholder"
+            "💚  Healthy alert after placeholder",
         ]
 
     with caplog.at_level(logging.WARNING, logger="stockchartsalerts.app"):
@@ -330,7 +330,7 @@ def test_poll_counts_non_object_rows_and_delivers_healthy_neighbor(
                     "bearish": "no",
                     "lastfired": "10 Mar 2024, 3:01am",
                     "symbol": "RECENT",
-                }
+                },
             ],
             b"recent spring alert",
         ),

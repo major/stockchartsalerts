@@ -30,7 +30,7 @@ def test_invalid_service_configuration_exits_without_logging_secrets_or_creating
                     "MINUTES_BETWEEN_RUNS": "0",
                 },
                 client_factory=unexpected_client_factory,
-            )
+            ),
         )
 
     assert result == 1
@@ -51,7 +51,7 @@ def test_client_startup_failure_logs_only_the_exception_type(
             async_main(
                 {"DISCORD_WEBHOOK_URLS": "https://discord.test/webhook/token-secret"},
                 client_factory=fail_client_factory,
-            )
+            ),
         )
 
     assert result == 1
@@ -90,7 +90,7 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
                     "GIT_COMMIT": commit,
                 },
                 client_factory=create_client,
-            )
+            ),
         )
         await request_started.wait()
         os.kill(os.getpid(), signal.SIGTERM)

@@ -26,7 +26,7 @@ def test_build_labels_and_log_level_are_normalized() -> None:
             "GIT_COMMIT": " abc ",
             "GIT_BRANCH": " main ",
             "LOG_LEVEL": " WARN ",
-        }
+        },
     )
 
     assert settings == Settings(
@@ -59,7 +59,7 @@ def test_build_labels_default_to_unknown_when_empty_or_whitespace_only(
             "DISCORD_WEBHOOK_URLS": "https://one",
             "GIT_COMMIT": raw_commit,
             "GIT_BRANCH": raw_branch,
-        }
+        },
     )
 
     assert (settings.git_commit, settings.git_branch) == (expected_commit, expected_branch)
@@ -75,7 +75,7 @@ def test_polling_interval_accepts_integer_text_at_inclusive_bounds(
         {
             "DISCORD_WEBHOOK_URLS": "https://one",
             "MINUTES_BETWEEN_RUNS": raw_minutes,
-        }
+        },
     )
 
     assert settings.minutes_between_runs == expected
@@ -89,7 +89,7 @@ def test_polling_interval_rejects_invalid_or_padded_integer_text(raw_minutes: st
             {
                 "DISCORD_WEBHOOK_URLS": "https://one",
                 "MINUTES_BETWEEN_RUNS": raw_minutes,
-            }
+            },
         )
 
 
