@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 
-import httpx
+import httpx2
 import pytest
 
 from stockchartsalerts.stockcharts import DEFAULT_ENDPOINT, FetchError, fetch_alerts
@@ -17,14 +17,14 @@ _USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/
 
 def test_fetch_alerts_sends_required_request_and_returns_json_array() -> None:
     async def scenario() -> None:
-        async def handle(request: httpx.Request) -> httpx.Response:
+        async def handle(request: httpx2.Request) -> httpx2.Response:
             assert request.method == "GET"
             assert str(request.url) == DEFAULT_ENDPOINT
             assert request.headers["Referer"] == _REFERER
             assert request.headers["User-Agent"] == _USER_AGENT
-            return httpx.Response(200, json=[{"symbol": "SPX"}, "raw row"])
+            return httpx2.Response(200, json=[{"symbol": "SPX"}, "raw row"])
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             assert await fetch_alerts(client) == [{"symbol": "SPX"}, "raw row"]
 
     asyncio.run(scenario())
@@ -37,17 +37,17 @@ def test_fetch_alerts_retries_status_failures_with_two_and_four_second_delays(
         requests = 0
         delays: list[float] = []
 
-        def handle(_request: httpx.Request) -> httpx.Response:
+        def handle(_request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             requests += 1
             if requests < 3:
-                return httpx.Response(503)
-            return httpx.Response(201, json=[])
+                return httpx2.Response(503)
+            return httpx2.Response(201, json=[])
 
         async def record_sleep(seconds: float) -> None:
             delays.append(seconds)
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             assert await fetch_alerts(client, sleep=record_sleep, endpoint="https://feed.test") == []
 
         assert requests == 3
@@ -76,15 +76,15 @@ def test_fetch_alerts_retries_malformed_or_non_array_json(
         requests = 0
         delays: list[float] = []
 
-        def handle(_request: httpx.Request) -> httpx.Response:
+        def handle(_request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             requests += 1
-            return httpx.Response(200, content=body)
+            return httpx2.Response(200, content=body)
 
         async def record_sleep(seconds: float) -> None:
             delays.append(seconds)
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             with pytest.raises(FetchError) as captured:
                 await fetch_alerts(
                     client,
@@ -112,15 +112,15 @@ def test_fetch_alerts_sanitizes_transport_errors_and_retries(caplog: pytest.LogC
         requests = 0
         delays: list[float] = []
 
-        def fail_with_secret(request: httpx.Request) -> httpx.Response:
+        def fail_with_secret(request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             requests += 1
-            raise httpx.ConnectError("secret transport details", request=request)
+            raise httpx2.ConnectError("secret transport details", request=request)
 
         async def record_sleep(seconds: float) -> None:
             delays.append(seconds)
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(fail_with_secret)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(fail_with_secret)) as client:
             with pytest.raises(FetchError) as captured:
                 await fetch_alerts(
                     client,
@@ -150,7 +150,7 @@ def test_fetch_alerts_deadline_covers_response_body_read_and_retries(
         body_reads = 0
         delays: list[float] = []
 
-        class HangingBody(httpx.AsyncByteStream):
+        class HangingBody(httpx2.AsyncByteStream):
             async def __aiter__(self) -> AsyncIterator[bytes]:
                 nonlocal body_reads
                 yield b"["
@@ -160,15 +160,15 @@ def test_fetch_alerts_deadline_covers_response_body_read_and_retries(
             async def aclose(self) -> None:
                 return None
 
-        def handle(_request: httpx.Request) -> httpx.Response:
+        def handle(_request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             requests += 1
-            return httpx.Response(200, stream=HangingBody())
+            return httpx2.Response(200, stream=HangingBody())
 
         async def record_sleep(seconds: float) -> None:
             delays.append(seconds)
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             with pytest.raises(FetchError) as captured:
                 await fetch_alerts(
                     client,
@@ -196,12 +196,12 @@ def test_fetch_alerts_propagates_cancellation_during_request() -> None:
     async def scenario() -> None:
         started = asyncio.Event()
 
-        async def hold_request(_request: httpx.Request) -> httpx.Response:
+        async def hold_request(_request: httpx2.Request) -> httpx2.Response:
             started.set()
             await asyncio.Future()
             raise AssertionError("unreachable")
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(hold_request)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(hold_request)) as client:
             task = asyncio.create_task(fetch_alerts(client, endpoint="https://feed.test"))
             await started.wait()
             task.cancel()

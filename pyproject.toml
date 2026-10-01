@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Poll StockCharts alerts and send new alerts to Discord webhooks."
 requires-python = ">=3.14"
 dependencies = [
-    "httpx>=0.27,<1",
+    "httpx2>=2.10,<3",
     "tzdata>=2024.1",
 ]
 

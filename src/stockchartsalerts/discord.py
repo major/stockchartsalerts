@@ -6,7 +6,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
-import httpx
+import httpx2
 
 from stockchartsalerts.alerts import Alert
 from stockchartsalerts.httpx_client import REQUEST_TIMEOUT_SECONDS
@@ -31,7 +31,7 @@ def make_payload(alert: Alert) -> dict[str, str]:
 
 
 async def send_alert_to_webhooks(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     alert: Alert,
     urls: Sequence[str],
     *,
@@ -45,7 +45,7 @@ async def send_alert_to_webhooks(
         try:
             async with asyncio.timeout(request_timeout):
                 response = await client.post(url, json=payload)
-        except (httpx.HTTPError, httpx.InvalidURL, TimeoutError, ValueError) as error:
+        except (httpx2.HTTPError, httpx2.InvalidURL, TimeoutError, ValueError) as error:
             logger.error(
                 "Discord webhook failed; webhook=%d/%d error=%s symbol=%s",
                 index,

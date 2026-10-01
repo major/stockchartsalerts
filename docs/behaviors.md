@@ -103,7 +103,7 @@ networking, scheduling, and process lifecycle.
 
 ### HTTP clients and fetches
 
-- The application creates one shared asynchronous `httpx` client at startup
+- The application creates one shared asynchronous `httpx2` client at startup
   and uses it for both StockCharts and Discord. Its request timeout is 30
   seconds. Close it during application shutdown; do not create clients in the
   polling loop.

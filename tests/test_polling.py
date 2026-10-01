@@ -8,7 +8,7 @@ import logging
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
-import httpx
+import httpx2
 import pytest
 
 from stockchartsalerts.app import App
@@ -40,14 +40,14 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
         )
         settings = _settings(webhook_urls=webhook_urls)
         stockcharts_requests = 0
-        discord_requests: list[httpx.Request] = []
+        discord_requests: list[httpx2.Request] = []
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             nonlocal stockcharts_requests
             if request.url.host == "stockcharts.com":
                 stockcharts_requests += 1
                 if stockcharts_requests == 1:
-                    return httpx.Response(
+                    return httpx2.Response(
                         200,
                         json=[
                             {
@@ -59,9 +59,9 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
                         ],
                     )
                 if stockcharts_requests < 5:
-                    return httpx.Response(503)
+                    return httpx2.Response(503)
                 if stockcharts_requests == 5:
-                    return httpx.Response(
+                    return httpx2.Response(
                         200,
                         json=[
                             {
@@ -72,7 +72,7 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
                             }
                         ],
                     )
-                return httpx.Response(
+                return httpx2.Response(
                     200,
                     json=[
                         {
@@ -85,9 +85,9 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
                 )
 
             discord_requests.append(request)
-            return httpx.Response(500)
+            return httpx2.Response(500)
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             application = App(settings, client, sleep=_no_wait)
             first_poll = datetime(2024, 1, 1, 15, 5, tzinfo=UTC)
             outage_poll = datetime(2024, 1, 1, 15, 30, tzinfo=UTC)
@@ -129,10 +129,10 @@ def test_poll_recovers_after_fetch_outage_and_advances_the_delivery_window() -> 
 
 def test_poll_rejects_naive_time_without_fetching() -> None:
     async def scenario() -> None:
-        def unexpected_request(_request: httpx.Request) -> httpx.Response:
+        def unexpected_request(_request: httpx2.Request) -> httpx2.Response:
             raise AssertionError("poll should reject the time before making a request")
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(unexpected_request)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(unexpected_request)) as client:
             application = App(_settings(), client, sleep=_no_wait)
             with pytest.raises(ValueError, match="timezone-aware"):
                 await application.poll(datetime(2024, 1, 1, 10, 5))
@@ -144,7 +144,7 @@ def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     async def scenario() -> None:
-        discord_requests: list[httpx.Request] = []
+        discord_requests: list[httpx2.Request] = []
         rows = [
             {
                 "alert": "Healthy neighbor",
@@ -195,14 +195,14 @@ def test_poll_logs_aggregate_rejections_and_delivers_healthy_rows(
             },
         ]
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             if request.url.host == "stockcharts.com":
-                return httpx.Response(200, json=rows)
+                return httpx2.Response(200, json=rows)
 
             discord_requests.append(request)
-            return httpx.Response(204)
+            return httpx2.Response(204)
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             application = App(_settings(), client, sleep=_no_wait)
             assert await application.poll(datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)) == 3
 
@@ -270,16 +270,16 @@ def test_initial_lookback_uses_elapsed_time_across_dst(
     expected_alert: bytes,
 ) -> None:
     async def scenario() -> None:
-        discord_requests: list[httpx.Request] = []
+        discord_requests: list[httpx2.Request] = []
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             if request.url.host == "stockcharts.com":
-                return httpx.Response(200, json=rows)
+                return httpx2.Response(200, json=rows)
 
             discord_requests.append(request)
-            return httpx.Response(204)
+            return httpx2.Response(204)
 
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             application = App(_settings(), client, sleep=_no_wait)
             assert await application.poll(now) == 1
 
@@ -296,10 +296,10 @@ def test_startup_failure_keeps_interval_and_recurring_errors_back_off(
         delays: list[float] = []
         events: list[str] = []
 
-        def always_fail(request: httpx.Request) -> httpx.Response:
+        def always_fail(request: httpx2.Request) -> httpx2.Response:
             assert request.url.host == "stockcharts.com"
             events.append("fetch")
-            return httpx.Response(503, text="upstream-private-response")
+            return httpx2.Response(503, text="upstream-private-response")
 
         async def controlled_sleep(seconds: float) -> None:
             if seconds > 4:
@@ -310,7 +310,7 @@ def test_startup_failure_keeps_interval_and_recurring_errors_back_off(
 
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
         with caplog.at_level(logging.ERROR, logger="stockchartsalerts.app"):
-            async with httpx.AsyncClient(transport=httpx.MockTransport(always_fail)) as client:
+            async with httpx2.AsyncClient(transport=httpx2.MockTransport(always_fail)) as client:
                 application = App(
                     _settings(),
                     client,
@@ -359,9 +359,9 @@ def test_scheduler_logs_unexpected_exception_types_and_continues(
                 return now
             raise ValueError("recurring-private-detail")
 
-        def empty_feed(request: httpx.Request) -> httpx.Response:
+        def empty_feed(request: httpx2.Request) -> httpx2.Response:
             assert request.url.host == "stockcharts.com"
-            return httpx.Response(200, json=[])
+            return httpx2.Response(200, json=[])
 
         async def controlled_sleep(seconds: float) -> None:
             delays.append(seconds)
@@ -369,7 +369,7 @@ def test_scheduler_logs_unexpected_exception_types_and_continues(
                 raise asyncio.CancelledError
 
         with caplog.at_level(logging.ERROR, logger="stockchartsalerts.app"):
-            async with httpx.AsyncClient(transport=httpx.MockTransport(empty_feed)) as client:
+            async with httpx2.AsyncClient(transport=httpx2.MockTransport(empty_feed)) as client:
                 application = App(
                     _settings(),
                     client,
@@ -401,13 +401,13 @@ def test_success_restores_the_regular_interval_after_a_recurring_failure() -> No
         delays: list[float] = []
         requests = 0
 
-        def fail_startup_and_first_recurring_poll(request: httpx.Request) -> httpx.Response:
+        def fail_startup_and_first_recurring_poll(request: httpx2.Request) -> httpx2.Response:
             nonlocal requests
             assert request.url.host == "stockcharts.com"
             requests += 1
             if requests <= 6:
-                return httpx.Response(503)
-            return httpx.Response(200, json=[])
+                return httpx2.Response(503)
+            return httpx2.Response(200, json=[])
 
         async def controlled_sleep(seconds: float) -> None:
             if seconds > 4:
@@ -416,7 +416,7 @@ def test_success_restores_the_regular_interval_after_a_recurring_failure() -> No
                     raise asyncio.CancelledError
 
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
-        async with httpx.AsyncClient(transport=httpx.MockTransport(fail_startup_and_first_recurring_poll)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(fail_startup_and_first_recurring_poll)) as client:
             application = App(
                 _settings(),
                 client,
@@ -435,16 +435,16 @@ def test_cancellation_interrupts_scheduler_wait() -> None:
     async def scenario() -> None:
         waiting = asyncio.Event()
 
-        def empty_feed(request: httpx.Request) -> httpx.Response:
+        def empty_feed(request: httpx2.Request) -> httpx2.Response:
             assert request.url.host == "stockcharts.com"
-            return httpx.Response(200, json=[])
+            return httpx2.Response(200, json=[])
 
         async def controlled_sleep(_seconds: float) -> None:
             waiting.set()
             await asyncio.Future()
 
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
-        async with httpx.AsyncClient(transport=httpx.MockTransport(empty_feed)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(empty_feed)) as client:
             application = App(
                 _settings(),
                 client,
@@ -464,13 +464,13 @@ def test_cancellation_interrupts_in_flight_fetch() -> None:
     async def scenario() -> None:
         request_started = asyncio.Event()
 
-        async def hold_request(request: httpx.Request) -> httpx.Response:
+        async def hold_request(request: httpx2.Request) -> httpx2.Response:
             assert request.url.host == "stockcharts.com"
             request_started.set()
             await asyncio.Future()
 
         now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
-        async with httpx.AsyncClient(transport=httpx.MockTransport(hold_request)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(hold_request)) as client:
             application = App(
                 _settings(),
                 client,
