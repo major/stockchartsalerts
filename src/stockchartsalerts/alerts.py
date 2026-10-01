@@ -106,17 +106,7 @@ def filter_alerts(rows: Sequence[object]) -> list[Alert]:
     return result
 
 
-def parse_timestamp(text: str) -> datetime:
-    """Parse a StockCharts timestamp into aware Eastern Time.
-
-    The accepted forms match Go's StockCharts layouts: lowercase ``am``/``pm``
-    without a preceding space, or uppercase ``AM``/``PM`` with one. A trailing
-    case-sensitive `` ET`` is optional. Ambiguous fall-back times use fold 0;
-    nonexistent spring-forward times follow Go's backward normalization.
-    """
-    if not isinstance(text, str):
-        raise ValueError("unsupported StockCharts timestamp")
-
+def _parse_stockcharts_wall_time(text: str) -> datetime:
     cleaned = text.strip()
     if cleaned.endswith(" ET"):
         cleaned = cleaned.removesuffix(" ET").strip()
@@ -149,6 +139,10 @@ def parse_timestamp(text: str) -> datetime:
     except ValueError as error:
         raise ValueError(f"unsupported StockCharts timestamp: {text}") from error
 
+    return wall_time
+
+
+def _localize_stockcharts_wall_time(wall_time: datetime, text: str) -> datetime:
     try:
         parsed = wall_time.replace(tzinfo=_STOCKCHARTS_TIME_ZONE, fold=0)
         round_trip = parsed.astimezone(timezone.utc).astimezone(_STOCKCHARTS_TIME_ZONE)
@@ -163,6 +157,21 @@ def parse_timestamp(text: str) -> datetime:
         raise ValueError(f"unsupported StockCharts timestamp: {text}") from error
 
     return parsed
+
+
+def parse_timestamp(text: str) -> datetime:
+    """Parse a StockCharts timestamp into aware Eastern Time.
+
+    The accepted forms match Go's StockCharts layouts: lowercase ``am``/``pm``
+    without a preceding space, or uppercase ``AM``/``PM`` with one. A trailing
+    case-sensitive `` ET`` is optional. Ambiguous fall-back times use fold 0;
+    nonexistent spring-forward times follow Go's backward normalization.
+    """
+    if not isinstance(text, str):
+        raise ValueError("unsupported StockCharts timestamp")
+
+    wall_time = _parse_stockcharts_wall_time(text)
+    return _localize_stockcharts_wall_time(wall_time, text)
 
 
 def _new_alerts_since(alerts: Sequence[Alert], previous_run: datetime) -> tuple[list[Alert], int]:
