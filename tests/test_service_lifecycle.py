@@ -20,6 +20,8 @@ def test_invalid_service_configuration_exits_without_logging_secrets_or_creating
     def unexpected_client_factory() -> httpx.AsyncClient:
         raise AssertionError("invalid configuration must not create an HTTP client")
 
+    caplog.set_level(logging.DEBUG, logger="httpx")
+    caplog.set_level(logging.DEBUG, logger="httpcore")
     with caplog.at_level(logging.ERROR):
         result = asyncio.run(
             async_main(
@@ -34,6 +36,29 @@ def test_invalid_service_configuration_exits_without_logging_secrets_or_creating
     assert result == 1
     assert "failed to load configuration" in caplog.text
     assert "secret.test" not in caplog.text
+
+
+def test_client_startup_failure_logs_only_the_exception_type(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def fail_client_factory() -> httpx.AsyncClient:
+        raise RuntimeError("failed for https://discord.test/webhook/token-secret")
+
+    caplog.set_level(logging.DEBUG, logger="httpx")
+    caplog.set_level(logging.DEBUG, logger="httpcore")
+    with caplog.at_level(logging.ERROR):
+        result = asyncio.run(
+            async_main(
+                {"DISCORD_WEBHOOK_URLS": "https://discord.test/webhook/token-secret"},
+                client_factory=fail_client_factory,
+            )
+        )
+
+    assert result == 1
+    assert "application failed" in caplog.text
+    assert "error=RuntimeError" in caplog.text
+    assert "discord.test" not in caplog.text
+    assert "token-secret" not in caplog.text
 
 
 def test_sigterm_cancels_poll_and_closes_the_shared_client(
@@ -70,6 +95,8 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
         assert len(clients) == 1
         assert clients[0].is_closed
 
+    caplog.set_level(logging.DEBUG, logger="httpx")
+    caplog.set_level(logging.DEBUG, logger="httpcore")
     with caplog.at_level(logging.INFO):
         asyncio.run(scenario())
 

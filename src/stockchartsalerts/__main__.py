@@ -60,11 +60,11 @@ async def async_main(
     except asyncio.CancelledError:
         logger.info("shutdown signal received; exiting")
         return 0
-    except Exception:
+    except Exception as error:
         # Integration errors are sanitized at their boundaries. Avoid logging
         # arbitrary exception details here in case a third-party error includes
         # a configured URL.
-        logger.error("application failed")
+        logger.error("application failed; error=%s", type(error).__name__)
         return 1
     finally:
         for signum in registered_signals:

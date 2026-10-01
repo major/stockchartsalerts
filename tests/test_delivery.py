@@ -238,9 +238,58 @@ def test_webhook_transport_failure_is_sanitized_and_delivery_continues(
     with caplog.at_level(logging.ERROR):
         asyncio.run(scenario())
     assert "Discord webhook failed" in caplog.text
+    assert "error=ConnectError" in caplog.text
     assert "first-secret" not in caplog.text
     assert "second-secret" not in caplog.text
     assert "discord.test" not in caplog.text
+
+
+def test_invalid_webhook_url_is_sanitized_and_delivery_continues(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        requests: list[str] = []
+
+        def handle(request: httpx.Request) -> httpx.Response:
+            requests.append(request.url.path)
+            return httpx.Response(204)
+
+        alert = Alert(bearish="no", symbol="SPX", alert="Alert", lastfired="")
+        urls = [
+            "https://discord.test:invalid/webhooks/first?token=first-secret",
+            "https://discord.test/webhooks/second?token=second-secret",
+        ]
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+            await send_alert_to_webhooks(client, alert, urls)
+
+        assert requests == ["/webhooks/second"]
+
+    with caplog.at_level(logging.ERROR):
+        asyncio.run(scenario())
+    assert "Discord webhook failed" in caplog.text
+    assert "error=InvalidURL" in caplog.text
+    assert "first-secret" not in caplog.text
+    assert "second-secret" not in caplog.text
+    assert "discord.test" not in caplog.text
+
+
+def test_unexpected_delivery_error_propagates() -> None:
+    async def scenario() -> None:
+        requests: list[str] = []
+
+        def fail_unexpectedly(request: httpx.Request) -> httpx.Response:
+            requests.append(request.url.path)
+            raise RuntimeError("unexpected programming failure")
+
+        alert = Alert(bearish="no", symbol="SPX", alert="Alert", lastfired="")
+        urls = ["https://discord.test/webhooks/first", "https://discord.test/webhooks/second"]
+        async with httpx.AsyncClient(transport=httpx.MockTransport(fail_unexpectedly)) as client:
+            with pytest.raises(RuntimeError, match="unexpected programming failure"):
+                await send_alert_to_webhooks(client, alert, urls)
+
+        assert requests == ["/webhooks/first"]
+
+    asyncio.run(scenario())
 
 
 def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
@@ -285,6 +334,7 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
     with caplog.at_level(logging.ERROR):
         asyncio.run(scenario())
     assert "Discord webhook failed" in caplog.text
+    assert "error=TimeoutError" in caplog.text
     assert "first-secret" not in caplog.text
     assert "second-secret" not in caplog.text
     assert "discord.test" not in caplog.text
