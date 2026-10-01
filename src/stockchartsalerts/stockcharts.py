@@ -7,7 +7,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import cast
 
-import httpx
+import httpx2
 
 from stockchartsalerts.httpx_client import REQUEST_TIMEOUT_SECONDS
 
@@ -25,7 +25,7 @@ class FetchError(Exception):
 
 
 async def fetch_alerts(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     *,
     sleep: Sleep = asyncio.sleep,
     endpoint: str = DEFAULT_ENDPOINT,
@@ -46,7 +46,7 @@ async def fetch_alerts(
 
 
 async def _fetch_once(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     endpoint: str,
     request_timeout: float,
 ) -> list[object]:
@@ -56,7 +56,7 @@ async def _fetch_once(
                 endpoint,
                 headers={"Referer": _REFERER, "User-Agent": _USER_AGENT},
             )
-    except httpx.HTTPError, TimeoutError, ValueError:
+    except httpx2.HTTPError, TimeoutError, ValueError:
         raise FetchError("StockCharts request failed") from None
 
     if not 200 <= response.status_code < 300:

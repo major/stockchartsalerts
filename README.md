@@ -2,7 +2,7 @@
 
 StockCharts Alerts polls the [StockCharts predefined alerts](https://stockcharts.com/freecharts/alertsummary.html) feed and sends new market alerts to Discord webhooks. It requires Python 3.14 or newer and is managed with `uv`.
 
-The package lives in `src/stockchartsalerts/`. Its `stockchartsalerts` console script starts the polling service. One shared asynchronous `httpx` client is created at application startup and reused for StockCharts and Discord requests. It has a 30-second timeout and is closed during shutdown.
+The package lives in `src/stockchartsalerts/`. Its `stockchartsalerts` console script starts the polling service. One shared asynchronous `httpx2` client is created at application startup and reused for StockCharts and Discord requests. It has a 30-second timeout and is closed during shutdown.
 
 ## Configuration
 

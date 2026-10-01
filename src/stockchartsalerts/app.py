@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-import httpx
+import httpx2
 
 from stockchartsalerts import alerts, discord, stockcharts
 from stockchartsalerts.config import Settings
@@ -29,7 +29,7 @@ class App:
     def __init__(
         self,
         settings: Settings,
-        client: httpx.AsyncClient,
+        client: httpx2.AsyncClient,
         *,
         clock: Clock = _eastern_now,
         sleep: Sleep = asyncio.sleep,

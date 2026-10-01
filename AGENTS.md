@@ -23,7 +23,7 @@ webhooks.
   latest-per-symbol selection.
 - `stockcharts.py`: StockCharts async fetch, response decoding, and retries.
 - `discord.py`: payload formatting and sequential best-effort webhook delivery.
-- `httpx_client.py`: shared async HTTP client creation and status handling.
+- `httpx_client.py`: shared async `httpx2` client creation and status handling.
 - `app.py`: polling orchestration, in-memory lookback state, scheduling,
   backoff, client lifecycle, and signal cancellation.
 - `telemetry.py`: plain-text logging setup.
@@ -38,7 +38,7 @@ webhooks.
   `unknown`.
 - StockCharts timestamps must be interpreted in `America/New_York`, including
   daylight-saving transitions.
-- Create one shared async `httpx` client during application startup. Reuse it
+- Create one shared async `httpx2` client during application startup. Reuse it
   for StockCharts and Discord requests, apply a 30-second timeout, and close it
   during shutdown. Never create clients inside the polling loop.
 - Handle SIGINT and SIGTERM by cancelling the async work and cleaning up the

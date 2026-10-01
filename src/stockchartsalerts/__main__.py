@@ -8,7 +8,7 @@ import os
 import signal
 from collections.abc import Callable, Mapping
 
-import httpx
+import httpx2
 
 from stockchartsalerts.app import App
 from stockchartsalerts.config import load_settings
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 async def async_main(
     env: Mapping[str, str] | None = None,
     *,
-    client_factory: Callable[[], httpx.AsyncClient] = create_http_client,
+    client_factory: Callable[[], httpx2.AsyncClient] = create_http_client,
 ) -> int:
     """Load settings and run the service until it is cancelled."""
     environment = os.environ if env is None else env

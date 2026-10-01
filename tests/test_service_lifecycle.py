@@ -7,7 +7,7 @@ import logging
 import os
 import signal
 
-import httpx
+import httpx2
 import pytest
 
 from stockchartsalerts.__main__ import async_main
@@ -17,11 +17,11 @@ from stockchartsalerts.httpx_client import create_http_client
 def test_invalid_service_configuration_exits_without_logging_secrets_or_creating_a_client(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def unexpected_client_factory() -> httpx.AsyncClient:
+    def unexpected_client_factory() -> httpx2.AsyncClient:
         raise AssertionError("invalid configuration must not create an HTTP client")
 
-    caplog.set_level(logging.DEBUG, logger="httpx")
-    caplog.set_level(logging.DEBUG, logger="httpcore")
+    caplog.set_level(logging.DEBUG, logger="httpx2")
+    caplog.set_level(logging.DEBUG, logger="httpcore2")
     with caplog.at_level(logging.ERROR):
         result = asyncio.run(
             async_main(
@@ -41,11 +41,11 @@ def test_invalid_service_configuration_exits_without_logging_secrets_or_creating
 def test_client_startup_failure_logs_only_the_exception_type(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def fail_client_factory() -> httpx.AsyncClient:
+    def fail_client_factory() -> httpx2.AsyncClient:
         raise RuntimeError("failed for https://discord.test/webhook/token-secret")
 
-    caplog.set_level(logging.DEBUG, logger="httpx")
-    caplog.set_level(logging.DEBUG, logger="httpcore")
+    caplog.set_level(logging.DEBUG, logger="httpx2")
+    caplog.set_level(logging.DEBUG, logger="httpcore2")
     with caplog.at_level(logging.ERROR):
         result = asyncio.run(
             async_main(
@@ -66,15 +66,15 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
 ) -> None:
     async def scenario() -> None:
         request_started = asyncio.Event()
-        clients: list[httpx.AsyncClient] = []
+        clients: list[httpx2.AsyncClient] = []
 
-        async def hold_request(request: httpx.Request) -> httpx.Response:
+        async def hold_request(request: httpx2.Request) -> httpx2.Response:
             assert request.url.host == "stockcharts.com"
             request_started.set()
             await asyncio.Future()
 
-        def create_client() -> httpx.AsyncClient:
-            client = httpx.AsyncClient(transport=httpx.MockTransport(hold_request))
+        def create_client() -> httpx2.AsyncClient:
+            client = httpx2.AsyncClient(transport=httpx2.MockTransport(hold_request))
             clients.append(client)
             return client
 
@@ -95,8 +95,8 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
         assert len(clients) == 1
         assert clients[0].is_closed
 
-    caplog.set_level(logging.DEBUG, logger="httpx")
-    caplog.set_level(logging.DEBUG, logger="httpcore")
+    caplog.set_level(logging.DEBUG, logger="httpx2")
+    caplog.set_level(logging.DEBUG, logger="httpcore2")
     with caplog.at_level(logging.INFO):
         asyncio.run(scenario())
 
@@ -107,7 +107,7 @@ def test_sigterm_cancels_poll_and_closes_the_shared_client(
 def test_shared_client_exposes_the_service_timeout_and_redirect_policy() -> None:
     async def scenario() -> None:
         async with create_http_client() as client:
-            assert client.timeout == httpx.Timeout(30.0)
+            assert client.timeout == httpx2.Timeout(30.0)
             assert client.follow_redirects
             assert client.max_redirects == 10
 

@@ -21,7 +21,7 @@ def configure_logging(log_level: str) -> str:
 
     root_logger = logging.getLogger()
     root_logger.setLevel(_LEVELS[normalized])
-    for library_logger in ("httpx", "httpcore"):
+    for library_logger in ("httpx2", "httpcore2"):
         logging.getLogger(library_logger).setLevel(logging.WARNING)
 
     if not root_logger.handlers:

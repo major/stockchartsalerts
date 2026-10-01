@@ -8,7 +8,7 @@ import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
-import httpx
+import httpx2
 import pytest
 
 from stockchartsalerts.alerts import Alert
@@ -35,13 +35,13 @@ def test_delivery_sends_formatted_discord_payload(
     async def scenario() -> None:
         payloads: list[dict[str, object]] = []
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             assert request.method == "POST"
             payloads.append(json.loads(request.content))
-            return httpx.Response(204)
+            return httpx2.Response(204)
 
         alert = Alert(bearish=bearish, symbol="$INDU", alert=text, lastfired="31 Jul 2024, 12:33pm")
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             await send_alert_to_webhooks(client, alert, ("https://discord.test/webhooks/test",))
 
         assert payloads == [
@@ -62,7 +62,7 @@ def test_webhooks_are_posted_sequentially_and_failures_do_not_stop_later_urls() 
         active_requests = 0
         maximum_active_requests = 0
 
-        async def handle(request: httpx.Request) -> httpx.Response:
+        async def handle(request: httpx2.Request) -> httpx2.Response:
             nonlocal active_requests, maximum_active_requests
             requests.append(request.url.path)
             payloads.append(json.loads(request.content))
@@ -71,10 +71,10 @@ def test_webhooks_are_posted_sequentially_and_failures_do_not_stop_later_urls() 
             await asyncio.sleep(0)
             active_requests -= 1
             if request.url.path.endswith("first"):
-                return httpx.Response(500)
+                return httpx2.Response(500)
             if request.url.path.endswith("second"):
-                return httpx.Response(202)
-            return httpx.Response(204)
+                return httpx2.Response(202)
+            return httpx2.Response(204)
 
         alert = Alert(
             bearish="no",
@@ -87,7 +87,7 @@ def test_webhooks_are_posted_sequentially_and_failures_do_not_stop_later_urls() 
             "https://discord.test/webhooks/second?token=second-secret",
             "https://discord.test/webhooks/third?token=third-secret",
         ]
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             await send_alert_to_webhooks(client, alert, urls)
 
         assert requests == ["/webhooks/first", "/webhooks/second", "/webhooks/third"]
@@ -120,10 +120,10 @@ def test_delivery_logs_keep_webhook_secrets_private_at_configured_levels(
         request_urls: list[str] = []
         payloads: list[dict[str, object]] = []
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             request_urls.append(str(request.url))
             if request.url.host == "stockcharts.com":
-                return httpx.Response(
+                return httpx2.Response(
                     200,
                     json=[
                         {
@@ -135,7 +135,7 @@ def test_delivery_logs_keep_webhook_secrets_private_at_configured_levels(
                     ],
                 )
             payloads.append(json.loads(request.content))
-            return httpx.Response(204)
+            return httpx2.Response(204)
 
         settings = Settings(
             webhook_urls=("https://discord.test/api/webhooks/token-secret?wait=true",),
@@ -144,7 +144,7 @@ def test_delivery_logs_keep_webhook_secrets_private_at_configured_levels(
             git_branch="main",
             log_level=configured,
         )
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             application = App(settings, client, sleep=lambda _seconds: asyncio.sleep(0))
             assert await application.poll(datetime(2024, 1, 1, 15, 5, tzinfo=UTC)) == 1
 
@@ -161,8 +161,8 @@ def test_delivery_logs_keep_webhook_secrets_private_at_configured_levels(
         ]
 
     caplog.set_level(logging.DEBUG)
-    caplog.set_level(logging.DEBUG, logger="httpx")
-    caplog.set_level(logging.DEBUG, logger="httpcore")
+    caplog.set_level(logging.DEBUG, logger="httpx2")
+    caplog.set_level(logging.DEBUG, logger="httpcore2")
     assert configure_logging(configured) == configured
     logging.getLogger("stockchartsalerts.app").debug("application debug marker")
     asyncio.run(scenario())
@@ -194,8 +194,8 @@ def test_configure_logging_emits_messages_at_normalized_level(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.DEBUG)
-    caplog.set_level(logging.DEBUG, logger="httpx")
-    caplog.set_level(logging.DEBUG, logger="httpcore")
+    caplog.set_level(logging.DEBUG, logger="httpx2")
+    caplog.set_level(logging.DEBUG, logger="httpcore2")
     assert configure_logging(configured) == normalized
 
     app_logger = logging.getLogger("stockchartsalerts.app")
@@ -214,11 +214,11 @@ def test_webhook_transport_failure_is_sanitized_and_delivery_continues(
     async def scenario() -> None:
         requests: list[str] = []
 
-        def fail_first(request: httpx.Request) -> httpx.Response:
+        def fail_first(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
             if request.url.path.endswith("first"):
-                raise httpx.ConnectError("first-secret leaked by transport", request=request)
-            return httpx.Response(200)
+                raise httpx2.ConnectError("first-secret leaked by transport", request=request)
+            return httpx2.Response(200)
 
         alert = Alert(
             bearish="yes",
@@ -230,7 +230,7 @@ def test_webhook_transport_failure_is_sanitized_and_delivery_continues(
             "https://discord.test/webhooks/first?token=first-secret",
             "https://discord.test/webhooks/second?token=second-secret",
         ]
-        async with httpx.AsyncClient(transport=httpx.MockTransport(fail_first)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(fail_first)) as client:
             await send_alert_to_webhooks(client, alert, urls)
 
         assert requests == ["/webhooks/first", "/webhooks/second"]
@@ -250,16 +250,16 @@ def test_invalid_webhook_url_is_sanitized_and_delivery_continues(
     async def scenario() -> None:
         requests: list[str] = []
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
-            return httpx.Response(204)
+            return httpx2.Response(204)
 
         alert = Alert(bearish="no", symbol="SPX", alert="Alert", lastfired="")
         urls = [
             "https://discord.test:invalid/webhooks/first?token=first-secret",
             "https://discord.test/webhooks/second?token=second-secret",
         ]
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             await send_alert_to_webhooks(client, alert, urls)
 
         assert requests == ["/webhooks/second"]
@@ -277,13 +277,13 @@ def test_unexpected_delivery_error_propagates() -> None:
     async def scenario() -> None:
         requests: list[str] = []
 
-        def fail_unexpectedly(request: httpx.Request) -> httpx.Response:
+        def fail_unexpectedly(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
             raise RuntimeError("unexpected programming failure")
 
         alert = Alert(bearish="no", symbol="SPX", alert="Alert", lastfired="")
         urls = ["https://discord.test/webhooks/first", "https://discord.test/webhooks/second"]
-        async with httpx.AsyncClient(transport=httpx.MockTransport(fail_unexpectedly)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(fail_unexpectedly)) as client:
             with pytest.raises(RuntimeError, match="unexpected programming failure"):
                 await send_alert_to_webhooks(client, alert, urls)
 
@@ -299,7 +299,7 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
         requests: list[str] = []
         body_reads = 0
 
-        class HangingBody(httpx.AsyncByteStream):
+        class HangingBody(httpx2.AsyncByteStream):
             async def __aiter__(self) -> AsyncIterator[bytes]:
                 nonlocal body_reads
                 yield b"pending"
@@ -309,11 +309,11 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
             async def aclose(self) -> None:
                 return None
 
-        def handle(request: httpx.Request) -> httpx.Response:
+        def handle(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
             if request.url.path.endswith("first"):
-                return httpx.Response(200, stream=HangingBody())
-            return httpx.Response(204)
+                return httpx2.Response(200, stream=HangingBody())
+            return httpx2.Response(204)
 
         alert = Alert(
             bearish="yes",
@@ -325,7 +325,7 @@ def test_webhook_timeout_during_body_read_is_sanitized_and_delivery_continues(
             "https://discord.test/webhooks/first?token=first-secret",
             "https://discord.test/webhooks/second?token=second-secret",
         ]
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
             await send_alert_to_webhooks(client, alert, urls, request_timeout=0.0)
 
         assert requests == ["/webhooks/first", "/webhooks/second"]
@@ -345,7 +345,7 @@ def test_webhook_request_propagates_cancellation() -> None:
         started = asyncio.Event()
         requests: list[str] = []
 
-        async def hold_request(request: httpx.Request) -> httpx.Response:
+        async def hold_request(request: httpx2.Request) -> httpx2.Response:
             requests.append(request.url.path)
             started.set()
             await asyncio.Future()
@@ -353,7 +353,7 @@ def test_webhook_request_propagates_cancellation() -> None:
 
         alert = Alert(bearish="no", symbol="SPX", alert="Alert", lastfired="")
         urls = ["https://discord.test/webhooks/first", "https://discord.test/webhooks/second"]
-        async with httpx.AsyncClient(transport=httpx.MockTransport(hold_request)) as client:
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(hold_request)) as client:
             task = asyncio.create_task(send_alert_to_webhooks(client, alert, urls))
             await started.wait()
             task.cancel()

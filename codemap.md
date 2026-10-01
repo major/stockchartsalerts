@@ -22,7 +22,7 @@ with bounded fetch retries and scheduler backoff.
 
 1. `__main__` initializes plain-text logging, loads validated environment
    settings, and starts the async application.
-2. `app` creates one shared asynchronous `httpx` client, performs one startup
+2. `app` creates one shared asynchronous `httpx2` client, performs one startup
    check, then schedules recurring checks and responds to SIGINT or SIGTERM.
 3. `stockcharts` fetches and decodes the StockCharts response with bounded
    retries. `alerts` normalizes and selects rows, parses timestamps in
@@ -51,14 +51,14 @@ with bounded fetch retries and scheduler backoff.
 | `alerts.py` | Alert row defaults, filtering, timestamp parsing, latest-per-symbol selection, and aggregate rejection counts. |
 | `stockcharts.py` | StockCharts HTTP request, response decoding, and fetch retries. |
 | `discord.py` | Discord payload formatting and sequential best-effort delivery. |
-| `httpx_client.py` | Shared async HTTP client defaults and response status checks. |
+| `httpx_client.py` | Shared async `httpx2` client defaults and response status checks. |
 | `telemetry.py` | Plain-text logging setup and log level selection. |
 
 ## Operational Constraints
 
 - All StockCharts timestamps use `America/New_York`.
 - `DISCORD_WEBHOOK_URLS` is the only supported webhook setting.
-- The shared async `httpx` client is created at application startup, reused for
+- The shared async `httpx2` client is created at application startup, reused for
   both integrations, and closed at shutdown. Do not create clients in the poll
   loop.
 - SIGINT and SIGTERM cancel the async polling work and allow client cleanup.
