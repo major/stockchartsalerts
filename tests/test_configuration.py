@@ -38,6 +38,33 @@ def test_build_labels_and_log_level_are_normalized() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("raw_commit", "raw_branch", "expected_commit", "expected_branch"),
+    [
+        ("", " main ", "unknown", "main"),
+        (" \t ", " main ", "unknown", "main"),
+        (" abc ", "", "abc", "unknown"),
+        (" abc ", " \t ", "abc", "unknown"),
+    ],
+)
+def test_build_labels_default_to_unknown_when_empty_or_whitespace_only(
+    raw_commit: str,
+    raw_branch: str,
+    expected_commit: str,
+    expected_branch: str,
+) -> None:
+    """Empty labels default to unknown while the other label is normalized."""
+    settings = load_settings(
+        {
+            "DISCORD_WEBHOOK_URLS": "https://one",
+            "GIT_COMMIT": raw_commit,
+            "GIT_BRANCH": raw_branch,
+        }
+    )
+
+    assert (settings.git_commit, settings.git_branch) == (expected_commit, expected_branch)
+
+
 @pytest.mark.parametrize(("raw_minutes", "expected"), [("1", 1), ("+001", 1), ("1440", 1440)])
 def test_polling_interval_accepts_integer_text_at_inclusive_bounds(
     raw_minutes: str,
