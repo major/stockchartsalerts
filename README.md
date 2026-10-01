@@ -42,6 +42,29 @@ with branch coverage, and `uv build`. The Makefile also provides `fmt`, `lint`,
 `types`, `test`, `coverage`, and `build` targets for running those checks
 separately. Tests are randomized by `pytest-randomly`; reproduce a run with its
 reported seed by passing `--randomly-seed=<seed>` to `uv run --locked pytest`.
+Property tests use Hypothesis, which saves failing examples in its local
+`.hypothesis/` database and reuses them on later runs. To reproduce a seeded run,
+pass both seeds (the values below are examples):
+
+```bash
+uv run --locked pytest --randomly-seed=12345 --hypothesis-seed=67890
+```
+
+Keep both seeds when reporting a seeded failure. For an unseeded failure, keep
+the saved example or use the replay instructions printed by Hypothesis.
+
+Mutation testing is optional and scoped to `alerts.py`, `config.py`, and
+`discord.py`. Run it and review its results with:
+
+```bash
+make mutate
+uv run --locked mutmut results
+```
+
+Mutants that survive may be equivalent or unreachable, not necessarily evidence
+of a missing test. Check the behavior and assertions before changing tests.
+Mutation testing is not part of `make all`; Hypothesis and mutmut keep generated
+files in ignored local directories.
 The dependency audit is separate:
 
 ```bash

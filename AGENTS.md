@@ -71,6 +71,12 @@ webhooks.
   depend on wall-clock time or the machine's local timezone.
 - Tests are randomized with `pytest-randomly`. Reproduce a test order by passing
   the reported seed to `uv run --locked pytest --randomly-seed=<seed>`.
+- Property tests use Hypothesis, which saves failing examples locally. For
+  seeded runs, preserve both `--randomly-seed` and `--hypothesis-seed`; otherwise
+  use the saved example or Hypothesis's printed replay instructions.
+- Mutation testing is optional and scoped initially to `alerts.py`, `config.py`,
+  and `discord.py`. A surviving mutant may be equivalent or unreachable, so
+  inspect the behavior before treating it as a test gap.
 
 ## Development Checks
 
@@ -84,6 +90,7 @@ make audit
 The coverage target is the single test run in `make all`. The individual
 Makefile targets are `fmt`, `lint`, `types`, `test`, `coverage`, and `build`.
 `make audit` runs `pip-audit`.
+`make mutate` runs the optional mutmut campaign and is not part of `make all`.
 
 ## Documentation Maintenance
 
