@@ -30,7 +30,9 @@ def test_fetch_alerts_sends_required_request_and_returns_json_array() -> None:
     asyncio.run(scenario())
 
 
-def test_fetch_alerts_retries_status_failures_with_two_and_four_second_delays() -> None:
+def test_fetch_alerts_retries_status_failures_with_two_and_four_second_delays(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     async def scenario() -> None:
         requests = 0
         delays: list[float] = []
@@ -51,11 +53,25 @@ def test_fetch_alerts_retries_status_failures_with_two_and_four_second_delays() 
         assert requests == 3
         assert delays == [2.0, 4.0]
 
-    asyncio.run(scenario())
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(scenario())
+    assert "StockCharts returned HTTP status 503" in caplog.text
+    assert "retrying attempt=1" in caplog.text
+    assert "retrying attempt=2" in caplog.text
 
 
-@pytest.mark.parametrize("body", [b"not json", b'{"alerts": []}'])
-def test_fetch_alerts_retries_malformed_or_non_array_json(body: bytes) -> None:
+@pytest.mark.parametrize(
+    ("body", "failure_reason"),
+    [
+        (b"not json", "StockCharts response was not valid JSON"),
+        (b'{"alerts": []}', "StockCharts response was not a JSON array"),
+    ],
+)
+def test_fetch_alerts_retries_malformed_or_non_array_json(
+    body: bytes,
+    failure_reason: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     async def scenario() -> None:
         requests = 0
         delays: list[float] = []
@@ -78,10 +94,17 @@ def test_fetch_alerts_retries_malformed_or_non_array_json(body: bytes) -> None:
 
         assert requests == 3
         assert delays == [2.0, 4.0]
+        assert failure_reason in str(captured.value)
         assert "secret" not in str(captured.value)
         assert "private" not in str(captured.value)
 
-    asyncio.run(scenario())
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(scenario())
+    assert failure_reason in caplog.text
+    assert "retrying attempt=1" in caplog.text
+    assert "retrying attempt=2" in caplog.text
+    assert "private" not in caplog.text
+    assert "feed.test" not in caplog.text
 
 
 def test_fetch_alerts_sanitizes_transport_errors_and_retries(caplog: pytest.LogCaptureFixture) -> None:
@@ -107,12 +130,16 @@ def test_fetch_alerts_sanitizes_transport_errors_and_retries(caplog: pytest.LogC
 
         assert requests == 3
         assert delays == [2.0, 4.0]
+        assert str(captured.value) == "StockCharts request failed"
         assert "secret" not in str(captured.value)
 
     with caplog.at_level(logging.WARNING):
         asyncio.run(scenario())
     assert "private" not in caplog.text
     assert "feed.test" not in caplog.text
+    assert "StockCharts request failed" in caplog.text
+    assert "retrying attempt=1" in caplog.text
+    assert "retrying attempt=2" in caplog.text
 
 
 def test_fetch_alerts_deadline_covers_response_body_read_and_retries(
@@ -153,12 +180,16 @@ def test_fetch_alerts_deadline_covers_response_body_read_and_retries(
         assert requests == 3
         assert body_reads == 3
         assert delays == [2.0, 4.0]
+        assert str(captured.value) == "StockCharts request failed"
         assert "private" not in str(captured.value)
 
     with caplog.at_level(logging.WARNING):
         asyncio.run(scenario())
     assert "private" not in caplog.text
     assert "feed.test" not in caplog.text
+    assert "StockCharts request failed" in caplog.text
+    assert "retrying attempt=1" in caplog.text
+    assert "retrying attempt=2" in caplog.text
 
 
 def test_fetch_alerts_propagates_cancellation_during_request() -> None:

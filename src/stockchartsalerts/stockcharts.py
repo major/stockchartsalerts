@@ -35,11 +35,11 @@ async def fetch_alerts(
     for attempt in range(len(_RETRY_DELAYS) + 1):
         try:
             return await _fetch_once(client, endpoint, request_timeout)
-        except FetchError:
+        except FetchError as error:
             if attempt == len(_RETRY_DELAYS):
                 raise
 
-            logger.warning("StockCharts fetch failed; retrying attempt=%d", attempt + 1)
+            logger.warning("StockCharts fetch failed; %s; retrying attempt=%d", error, attempt + 1)
             await sleep(_RETRY_DELAYS[attempt])
 
     raise AssertionError("unreachable retry state")
