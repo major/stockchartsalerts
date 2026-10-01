@@ -1,45 +1,28 @@
-.PHONY: all fmt fmt-fix lint test doc build coverage audit
+.PHONY: all fmt fmt-fix lint types test build coverage audit
 
-all: fmt lint test doc build
+all: fmt lint types coverage build
 
 fmt:
-	@test -z "$$(gofumpt -l .)" || (gofumpt -l . && exit 1)
+	uv run --locked ruff format --check .
 
 fmt-fix:
-	gofumpt -w .
+	uv run --locked ruff format .
 
 lint:
-	golangci-lint run
+	uv run --locked ruff check .
+
+types:
+	uv run --locked mypy src/stockchartsalerts
+	uv run --locked pyright
 
 test:
-	go test ./...
-
-doc:
-	go vet ./...
-
-build:
-	go build ./cmd/stockchartsalerts
+	uv run --locked pytest
 
 coverage:
-	go test ./internal/... -coverprofile=coverage.out
-	@echo "Checking per-package coverage (minimum 95%)..."
-	@for pkg in $$(go list ./internal/...); do \
-		pct=$$(go test $$pkg -cover 2>&1 | grep -oP 'coverage: \K[0-9.]+'); \
-		if [ -z "$$pct" ]; then \
-			echo "FAIL: Could not determine coverage for $$pkg"; \
-			exit 1; \
-		fi; \
-		pct_int=$$(echo $$pct | cut -d. -f1); \
-		if [ $$pct_int -lt 95 ]; then \
-			echo "FAIL: $$pkg coverage $$pct% is below 95%"; \
-			exit 1; \
-		fi; \
-		echo "  $$pkg: $$pct%"; \
-	done
-	@echo "Checking total coverage..."
-	@go tool cover -func=coverage.out | tail -1 | awk '{gsub(/%/, "", $$NF); pct = $$NF; \
-		print "Total coverage (internal packages): " pct "%"; \
-		if (pct + 0 < 95) {print "FAIL: coverage below 95%"; exit 1} else {print "PASS: coverage >= 95%"}}'
+	uv run --locked pytest --cov=stockchartsalerts --cov-branch --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
+
+build:
+	uv build
 
 audit:
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+	uv run --locked pip-audit

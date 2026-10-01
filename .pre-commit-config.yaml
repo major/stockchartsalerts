@@ -11,15 +11,25 @@ repos:
 
   - repo: local
     hooks:
-      - id: gofumpt
-        name: gofumpt
-        entry: bash -c 'out="$(gofumpt -l .)"; if [ -n "$out" ]; then echo "$out"; exit 1; fi'
+      - id: ruff-format
+        name: Ruff format
+        entry: uv run --locked ruff format --check
+        language: system
+        types: [python]
+      - id: ruff-check
+        name: Ruff lint
+        entry: uv run --locked ruff check
+        language: system
+        types: [python]
+      - id: mypy
+        name: MyPy
+        entry: uv run --locked mypy src/stockchartsalerts
         language: system
         pass_filenames: false
-        types: [go]
-      - id: golangci-lint
-        name: golangci-lint
-        entry: golangci-lint run
+        always_run: true
+      - id: pyright
+        name: Pyright
+        entry: uv run --locked pyright
         language: system
         pass_filenames: false
-        types: [go]
+        always_run: true

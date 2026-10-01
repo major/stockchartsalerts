@@ -10,12 +10,24 @@
 .env
 .env.*
 
-# Go build output and coverage
-coverage.out
+# Build output and coverage
 coverage.html
 lcov.info
 coverage.xml
 htmlcov/
+.coverage
+.coverage.*
+
+# Python tooling and build output
+.worktrees/
+.venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+dist/
+build/
+*.egg-info/
 
 # Development
 .vscode/
