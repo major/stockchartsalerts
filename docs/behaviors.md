@@ -95,8 +95,8 @@ networking, scheduling, and process lifecycle.
   supported.
 - `MINUTES_BETWEEN_RUNS` defaults to `5`, must be integer text without leading
   or trailing whitespace, and must be between `1` and `1440` inclusive.
-- `GIT_COMMIT` and `GIT_BRANCH` are optional labels in the startup log. Each
-  defaults to `unknown`.
+- Startup logs include a plain-text banner with `GIT_BRANCH` and the full
+  `GIT_COMMIT` value. Both are optional and default to `unknown`.
 - `LOG_LEVEL` accepts `debug`, `info`, `warn`, or `error`; the default and the
   fallback for an unknown value are `info`.
 - Logs are plain text, not JSON. Sentry is not configured.
