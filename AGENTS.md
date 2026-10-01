@@ -61,6 +61,10 @@ webhooks.
 - Test observable behavior through public package boundaries. For network
   behavior, use local test servers or injected clients at the HTTP boundary.
   Avoid mocks of internal helpers and implementation details.
+- Pytest blocks external socket connections by default. Its allow-list is limited
+  to IPv4 and IPv6 loopback addresses, and Unix sockets are allowed for asyncio
+  and local tests. Do not enable unrestricted sockets or add external hosts to
+  the allow-list.
 - Cover important branches and failure paths, but do not change behavior or add
   contrived tests only to raise a coverage percentage.
 - Use explicit `America/New_York` timestamps in time-sensitive tests. Do not
