@@ -23,6 +23,7 @@ dev = [
     "pytest>=8",
     "pytest-cov>=6",
     "pytest-randomly>=3.15",
+    "pytest-socket>=0.8.1",
     "ruff>=0.11",
 ]
 
@@ -40,7 +41,12 @@ pythonVersion = "3.14"
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
-addopts = "--cov-context=test"
+addopts = """
+--cov-context=test
+--disable-socket
+--allow-hosts=127.0.0.0/8,::1/128
+--allow-unix-socket
+"""
 testpaths = ["tests"]
 pythonpath = ["src"]
 
