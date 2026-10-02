@@ -549,6 +549,49 @@ def test_success_restores_the_regular_interval_after_a_recurring_failure() -> No
     asyncio.run(scenario())
 
 
+def test_success_resets_recurring_failure_count_after_long_backoff() -> None:
+    """A success after five recurring failures resets the next failure to 60 seconds."""
+
+    async def scenario() -> None:
+        delays: list[float] = []
+        scheduled_waits_before_cancel = 8
+        scheduled_polls = 0
+        now = datetime(2024, 1, 1, 10, 5, tzinfo=_EASTERN)
+
+        def handle(request: httpx2.Request) -> httpx2.Response:
+            nonlocal scheduled_polls
+            assert request.url.host == "stockcharts.com"
+            # Startup succeeds. Failed polls include retries, so decide each
+            # poll's response from the scheduler wait, not the request count.
+            if scheduled_polls == 0:
+                return httpx2.Response(200, json=[])
+            if scheduled_polls in {1, 2, 3, 4, 5, 7}:
+                return httpx2.Response(503)
+            return httpx2.Response(200, json=[])
+
+        async def controlled_sleep(seconds: float) -> None:
+            nonlocal scheduled_polls
+            if seconds not in (2, 4):
+                delays.append(seconds)
+                scheduled_polls += 1
+                if len(delays) == scheduled_waits_before_cancel:
+                    raise asyncio.CancelledError
+
+        async with httpx2.AsyncClient(transport=httpx2.MockTransport(handle)) as client:
+            application = App(
+                _settings(),
+                client,
+                clock=lambda: now,
+                sleep=controlled_sleep,
+            )
+            with pytest.raises(asyncio.CancelledError):
+                await application.run()
+
+        assert delays == [300, 60, 60, 60, 60, 300, 300, 60]
+
+    asyncio.run(scenario())
+
+
 def test_cancellation_interrupts_scheduler_wait() -> None:
     """Propagate cancellation while waiting for the next scheduled poll."""
 

@@ -35,6 +35,9 @@ networking, scheduling, and process lifecycle.
 - During the fall daylight-saving overlap, choose the earliest corresponding
   instant. For example, `3 Nov 2024, 1:30am` means the first 1:30 a.m. in New
   York, with the EDT offset.
+- During the spring daylight-saving gap, normalize a nonexistent wall time
+  backward by the size of the offset change. For example,
+  `10 Mar 2024, 2:30am` resolves to `10 Mar 2024, 1:30am` EST.
 - An invalid or unrepresentable timestamp, including a timezone conversion that
   exceeds Python's `datetime` range, is skipped.
 - When feed rows are rejected, the poll emits at most one warning with aggregate
