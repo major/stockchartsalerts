@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-314:latest@sha256:c19e852fe0c935dad0ecc2ef6a90582612e57ed4653ca32ec974606637520ce2 AS builder
+FROM registry.access.redhat.com/ubi9/python-314:latest@sha256:14b7b7245ed127d7b1cef888b2f90e3d0f91638566c2656765d82646ec9bb30c AS builder
 
 WORKDIR /opt/app-root/src
 
@@ -8,7 +8,7 @@ COPY src ./src
 RUN python3 -m pip install --no-cache-dir uv==0.12.18 \
     && uv sync --locked --no-dev --no-editable --python python3.14
 
-FROM registry.access.redhat.com/ubi9/python-314:latest@sha256:c19e852fe0c935dad0ecc2ef6a90582612e57ed4653ca32ec974606637520ce2
+FROM registry.access.redhat.com/ubi9/python-314:latest@sha256:14b7b7245ed127d7b1cef888b2f90e3d0f91638566c2656765d82646ec9bb30c
 
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
